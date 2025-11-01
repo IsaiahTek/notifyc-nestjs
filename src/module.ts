@@ -2,6 +2,13 @@
 // NOTIFICATIONS MODULE
 // ============================================================================
 
+import { Global, Module, DynamicModule, Provider } from "@nestjs/common";
+import { NotificationsController } from "./controllers/notification.controller";
+import { NotificationsGateway } from "./gateways/notifications-websocket.gateway";
+import { NotificationsService } from "./services/notification.service";
+import { NotificationsModuleOptions, NOTIFICATION_CENTER, NOTIFICATION_OPTIONS, NotificationsModuleAsyncOptions } from "./types/types";
+import { NotificationCenter } from "@synq/notifications-core";
+
 @Global()
 @Module({})
 export class NotificationsModule {
@@ -44,7 +51,7 @@ export class NotificationsModule {
       ? [NotificationsController] 
       : [];
 
-    const exports = [NotificationsService, NOTIFICATION_CENTER];
+    const exports: any[] = [NotificationsService, NOTIFICATION_CENTER];
 
     // Add WebSocket gateway if enabled
     if (options.enableWebSocket !== false) {
@@ -58,6 +65,31 @@ export class NotificationsModule {
       controllers,
       exports
     };
+
+    // const providers: Provider[] = [
+    //   optionsProvider,
+    //   notificationCenterProvider,
+    //   NotificationsService // <--- NotificationsService is the provider here
+    // ];
+
+    // const controllers = options.enableRestApi !== false 
+    //   ? [NotificationsController] 
+    //   : [];
+
+    // const exports: any[] = [NotificationsService, NOTIFICATION_CENTER];
+
+    // // Add WebSocket gateway if enabled
+    // if (options.enableWebSocket !== false) {
+    //   providers.push(NotificationsGateway);
+    //   exports.push(NotificationsGateway);
+    // }
+
+    // return {
+    //   module: NotificationsModule,
+    //   providers, // <--- NotificationsGateway should NOT be here
+    //   controllers,
+    //   exports
+    // };
   }
 
   static forRootAsync(

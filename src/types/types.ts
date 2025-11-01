@@ -2,6 +2,8 @@
 // TYPES & CONSTANTS
 // ============================================================================
 
+import { NotificationConfig, NotificationTemplate } from "@synq/notifications-core";
+
 export const NOTIFICATION_OPTIONS = 'NOTIFICATION_OPTIONS';
 export const NOTIFICATION_CENTER = 'NOTIFICATION_CENTER';
 

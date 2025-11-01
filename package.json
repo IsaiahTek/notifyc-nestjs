@@ -4,7 +4,10 @@
   "description": "Official NotifyC NestJs Wrapper that makes it super easy to send and manage notifications from within your NestJs backend",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "prepare": "npm run build",
+    "prepublishOnly": "npm run build"
   },
   "repository": {
     "type": "git",
@@ -27,5 +30,16 @@
   "bugs": {
     "url": "https://github.com/IsaiahTek/notifyc-nestjs/issues"
   },
-  "homepage": "https://github.com/IsaiahTek/notifyc-nestjs#readme"
+  "homepage": "https://github.com/IsaiahTek/notifyc-nestjs#readme",
+  "peerDependencies": {
+    "@nestjs/common": "^11.1.8",
+    "@nestjs/websockets": "^11.1.8",
+    "socket.io": "^4.8.1"
+  },
+  "dependencies": {
+    "@synq/notifications-core": "github:IsaiahTek/notify-core"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
 }

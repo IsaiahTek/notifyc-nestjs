@@ -1,6 +1,19 @@
 // ============================================================================
 // WEBSOCKET GATEWAY
 // ============================================================================
+import { Logger } from '@nestjs/common';
+import {
+  WebSocketGateway,
+  WebSocketServer,
+  SubscribeMessage,
+  OnGatewayConnection,
+  OnGatewayDisconnect,
+  ConnectedSocket,
+  MessageBody,
+} from '@nestjs/websockets';
+import { NotificationsService } from '../services/notification.service';
+import { Unsubscribe } from '@synq/notifications-core';
+import { Server, Socket } from 'socket.io';
 
 @WebSocketGateway({
   cors: { origin: '*' },
@@ -12,13 +25,13 @@ export class NotificationsGateway
   private subscriptions = new Map<string, Unsubscribe>();
 
   @WebSocketServer()
-  server: Server;
+  server!: Server;
 
-  constructor(private readonly notificationsService: NotificationsService) {}
+  constructor(private readonly notificationsService: NotificationsService) { }
 
   handleConnection(client: Socket) {
     const userId = client.handshake.query.userId as string;
-    
+
     if (!userId) {
       this.logger.warn('Client connected without userId');
       client.disconnect();
@@ -61,7 +74,7 @@ export class NotificationsGateway
 
   handleDisconnect(client: Socket) {
     this.logger.log(`Client disconnected: ${client.id}`);
-    
+
     const unsubscribe = this.subscriptions.get(client.id);
     if (unsubscribe) {
       unsubscribe();
