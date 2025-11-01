@@ -4,11 +4,13 @@
 
 import { Inject, Injectable, OnModuleInit, OnModuleDestroy, Logger } from "@nestjs/common";
 import { NotificationCenter, NotificationInput, NotificationFilters, NotificationPreferences, NotificationTemplate, Unsubscribe, Notification } from "@synq/notifications-core";
+import { EventEmitter } from "events";
 import { NOTIFICATION_CENTER } from "../types/types";
 
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(NotificationsService.name);
+    private eventEmitter = new EventEmitter();
 
     constructor(
         @Inject(NOTIFICATION_CENTER)
@@ -25,14 +27,38 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         this.logger.log('Notification system stopped');
     }
 
+    // ========== EVENT EMITTER (for WebSocket integration) ==========
+
+    onNotificationSent(callback: (notification: Notification) => void): () => void {
+        this.eventEmitter.on('notification:sent', callback);
+        return () => this.eventEmitter.off('notification:sent', callback);
+    }
+
+    onUnreadCountChanged(callback: (userId: string, count: number) => void): () => void {
+        this.eventEmitter.on('unread:changed', callback);
+        return () => this.eventEmitter.off('unread:changed', callback);
+    }
+
     // ========== SEND OPERATIONS ==========
 
     async send(input: NotificationInput): Promise<Notification> {
-        return this.notificationCenter.send(input);
+        const notification = await this.notificationCenter.send(input);
+
+        // Emit event for WebSocket to pick up
+        this.eventEmitter.emit('notification:sent', notification);
+
+        return notification;
     }
 
     async sendBatch(inputs: NotificationInput[]): Promise<Notification[]> {
-        return this.notificationCenter.sendBatch(inputs);
+        const notifications = await this.notificationCenter.sendBatch(inputs);
+
+        // Emit event for each notification
+        notifications.forEach(notification => {
+            this.eventEmitter.emit('notification:sent', notification);
+        });
+
+        return notifications;
     }
 
     async schedule(input: NotificationInput, when: Date): Promise<string> {
@@ -63,11 +89,18 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     // ========== STATE OPERATIONS ==========
 
     async markAsRead(notificationId: string): Promise<void> {
-        return this.notificationCenter.markAsRead(notificationId);
+        const notification = await this.notificationCenter.getById(notificationId);
+        await this.notificationCenter.markAsRead(notificationId);
+
+        if (notification) {
+            const count = await this.notificationCenter.getUnreadCount(notification.userId);
+            this.eventEmitter.emit('unread:changed', notification.userId, count);
+        }
     }
 
     async markAllAsRead(userId: string): Promise<void> {
-        return this.notificationCenter.markAllAsRead(userId);
+        await this.notificationCenter.markAllAsRead(userId);
+        this.eventEmitter.emit('unread:changed', userId, 0);
     }
 
     async delete(notificationId: string): Promise<void> {
@@ -108,7 +141,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
     onUnreadCountChange(
         userId: string,
-        callback: (count: number) => void
+        callback: (count: number, userId: string) => void
     ): Unsubscribe {
         return this.notificationCenter.onUnreadCountChange(userId, callback);
     }

@@ -2,7 +2,7 @@
   "name": "notifyc-nestjs",
   "version": "1.0.0",
   "description": "Official NotifyC NestJs Wrapper that makes it super easy to send and manage notifications from within your NestJs backend",
-  "main": "index.js",
+  "main": "dist/index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",

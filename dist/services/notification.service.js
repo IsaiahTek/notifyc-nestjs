@@ -19,11 +19,13 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsService = void 0;
 const common_1 = require("@nestjs/common");
 const notifications_core_1 = require("@synq/notifications-core");
+const events_1 = require("events");
 const types_1 = require("../types/types");
 let NotificationsService = NotificationsService_1 = class NotificationsService {
     constructor(notificationCenter) {
         this.notificationCenter = notificationCenter;
         this.logger = new common_1.Logger(NotificationsService_1.name);
+        this.eventEmitter = new events_1.EventEmitter();
     }
     async onModuleInit() {
         await this.notificationCenter.start();
@@ -33,12 +35,29 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         await this.notificationCenter.stop();
         this.logger.log('Notification system stopped');
     }
+    // ========== EVENT EMITTER (for WebSocket integration) ==========
+    onNotificationSent(callback) {
+        this.eventEmitter.on('notification:sent', callback);
+        return () => this.eventEmitter.off('notification:sent', callback);
+    }
+    onUnreadCountChanged(callback) {
+        this.eventEmitter.on('unread:changed', callback);
+        return () => this.eventEmitter.off('unread:changed', callback);
+    }
     // ========== SEND OPERATIONS ==========
     async send(input) {
-        return this.notificationCenter.send(input);
+        const notification = await this.notificationCenter.send(input);
+        // Emit event for WebSocket to pick up
+        this.eventEmitter.emit('notification:sent', notification);
+        return notification;
     }
     async sendBatch(inputs) {
-        return this.notificationCenter.sendBatch(inputs);
+        const notifications = await this.notificationCenter.sendBatch(inputs);
+        // Emit event for each notification
+        notifications.forEach(notification => {
+            this.eventEmitter.emit('notification:sent', notification);
+        });
+        return notifications;
     }
     async schedule(input, when) {
         return this.notificationCenter.schedule(input, when);
@@ -58,10 +77,16 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     // ========== STATE OPERATIONS ==========
     async markAsRead(notificationId) {
-        return this.notificationCenter.markAsRead(notificationId);
+        const notification = await this.notificationCenter.getById(notificationId);
+        await this.notificationCenter.markAsRead(notificationId);
+        if (notification) {
+            const count = await this.notificationCenter.getUnreadCount(notification.userId);
+            this.eventEmitter.emit('unread:changed', notification.userId, count);
+        }
     }
     async markAllAsRead(userId) {
-        return this.notificationCenter.markAllAsRead(userId);
+        await this.notificationCenter.markAllAsRead(userId);
+        this.eventEmitter.emit('unread:changed', userId, 0);
     }
     async delete(notificationId) {
         return this.notificationCenter.delete(notificationId);

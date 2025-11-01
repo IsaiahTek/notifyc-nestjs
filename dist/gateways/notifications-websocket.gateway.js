@@ -25,7 +25,26 @@ let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
     constructor(notificationsService) {
         this.notificationsService = notificationsService;
         this.logger = new common_1.Logger(NotificationsGateway_1.name);
-        this.subscriptions = new Map();
+        this.clientSubscriptions = new Map();
+        this.userToClients = new Map(); // userId -> Set of socket.ids
+    }
+    onModuleInit() {
+        // This is the KEY fix - Subscribe to ALL notifications globally
+        // and broadcast to connected clients for that user
+        this.notificationsService.subscribe('*', (notification) => {
+            this.broadcastToUser(notification.userId, 'notification', {
+                type: 'notification',
+                notification
+            });
+        });
+        // Subscribe to unread count changes for all users
+        this.notificationsService.onUnreadCountChange('*', (count, userId) => {
+            this.broadcastToUser(userId, 'unread-count', {
+                type: 'unread-count',
+                count
+            });
+        });
+        this.logger.log('WebSocket gateway initialized with global subscriptions');
     }
     handleConnection(client) {
         const userId = client.handshake.query.userId;
@@ -35,35 +54,41 @@ let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
             return;
         }
         this.logger.log(`Client connected: ${client.id} (userId: ${userId})`);
-        // Subscribe to notifications
-        const unsubscribe = this.notificationsService.subscribe(userId, (notification) => {
-            client.emit('notification', {
-                type: 'notification',
-                notification
-            });
-        });
-        // Subscribe to unread count changes
-        const unsubscribeCount = this.notificationsService.onUnreadCountChange(userId, (count) => {
-            client.emit('unread-count', {
-                type: 'unread-count',
-                count
-            });
-        });
-        // Store subscriptions
-        this.subscriptions.set(client.id, () => {
-            unsubscribe();
-            unsubscribeCount();
-        });
+        // Track this client for this user
+        if (!this.userToClients.has(userId)) {
+            this.userToClients.set(userId, new Set());
+        }
+        this.userToClients.get(userId).add(client.id);
+        // Store userId on socket for easy access
+        client.userId = userId;
         // Send initial data
         this.sendInitialData(client, userId);
     }
     handleDisconnect(client) {
-        this.logger.log(`Client disconnected: ${client.id}`);
-        const unsubscribe = this.subscriptions.get(client.id);
-        if (unsubscribe) {
-            unsubscribe();
-            this.subscriptions.delete(client.id);
+        const userId = client.userId;
+        this.logger.log(`Client disconnected: ${client.id} (userId: ${userId})`);
+        // Remove client from user's client list
+        if (userId) {
+            const clients = this.userToClients.get(userId);
+            if (clients) {
+                clients.delete(client.id);
+                if (clients.size === 0) {
+                    this.userToClients.delete(userId);
+                }
+            }
         }
+    }
+    broadcastToUser(userId, event, data) {
+        const clientIds = this.userToClients.get(userId);
+        if (!clientIds || clientIds.size === 0)
+            return;
+        // Broadcast to all connected clients for this user
+        clientIds.forEach(clientId => {
+            const socket = this.server.sockets.sockets.get(clientId);
+            if (socket) {
+                socket.emit(event, data);
+            }
+        });
     }
     async handleMarkAsRead(client, data) {
         await this.notificationsService.markAsRead(data.notificationId);

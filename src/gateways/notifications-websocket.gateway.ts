@@ -1,7 +1,7 @@
 // ============================================================================
 // WEBSOCKET GATEWAY
 // ============================================================================
-import { Logger } from '@nestjs/common';
+import { Logger, OnModuleInit } from '@nestjs/common';
 import {
   WebSocketGateway,
   WebSocketServer,
@@ -20,14 +20,36 @@ import { Server, Socket } from 'socket.io';
   namespace: '/notifications'
 })
 export class NotificationsGateway
-  implements OnGatewayConnection, OnGatewayDisconnect {
+  implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
   private readonly logger = new Logger(NotificationsGateway.name);
-  private subscriptions = new Map<string, Unsubscribe>();
+  private clientSubscriptions = new Map<string, Unsubscribe[]>();
+  private userToClients = new Map<string, Set<string>>(); // userId -> Set of socket.ids
 
   @WebSocketServer()
   server!: Server;
 
   constructor(private readonly notificationsService: NotificationsService) { }
+
+  onModuleInit() {
+    // This is the KEY fix - Subscribe to ALL notifications globally
+    // and broadcast to connected clients for that user
+    this.notificationsService.subscribe('*', (notification) => {
+      this.broadcastToUser(notification.userId, 'notification', {
+        type: 'notification',
+        notification
+      });
+    });
+
+    // Subscribe to unread count changes for all users
+    this.notificationsService.onUnreadCountChange('*', (count, userId) => {
+      this.broadcastToUser(userId, 'unread-count', {
+        type: 'unread-count',
+        count
+      });
+    });
+
+    this.logger.log('WebSocket gateway initialized with global subscriptions');
+  }
 
   handleConnection(client: Socket) {
     const userId = client.handshake.query.userId as string;
@@ -40,46 +62,46 @@ export class NotificationsGateway
 
     this.logger.log(`Client connected: ${client.id} (userId: ${userId})`);
 
-    // Subscribe to notifications
-    const unsubscribe = this.notificationsService.subscribe(
-      userId,
-      (notification) => {
-        client.emit('notification', {
-          type: 'notification',
-          notification
-        });
-      }
-    );
+    // Track this client for this user
+    if (!this.userToClients.has(userId)) {
+      this.userToClients.set(userId, new Set());
+    }
+    this.userToClients.get(userId)!.add(client.id);
 
-    // Subscribe to unread count changes
-    const unsubscribeCount = this.notificationsService.onUnreadCountChange(
-      userId,
-      (count) => {
-        client.emit('unread-count', {
-          type: 'unread-count',
-          count
-        });
-      }
-    );
-
-    // Store subscriptions
-    this.subscriptions.set(client.id, () => {
-      unsubscribe();
-      unsubscribeCount();
-    });
+    // Store userId on socket for easy access
+    (client as any).userId = userId;
 
     // Send initial data
     this.sendInitialData(client, userId);
   }
 
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
+    const userId = (client as any).userId;
+    this.logger.log(`Client disconnected: ${client.id} (userId: ${userId})`);
 
-    const unsubscribe = this.subscriptions.get(client.id);
-    if (unsubscribe) {
-      unsubscribe();
-      this.subscriptions.delete(client.id);
+    // Remove client from user's client list
+    if (userId) {
+      const clients = this.userToClients.get(userId);
+      if (clients) {
+        clients.delete(client.id);
+        if (clients.size === 0) {
+          this.userToClients.delete(userId);
+        }
+      }
     }
+  }
+
+  private broadcastToUser(userId: string, event: string, data: any) {
+    const clientIds = this.userToClients.get(userId);
+    if (!clientIds || clientIds.size === 0) return;
+
+    // Broadcast to all connected clients for this user
+    clientIds.forEach(clientId => {
+      const socket = this.server.sockets.sockets.get(clientId);
+      if (socket) {
+        socket.emit(event, data);
+      }
+    });
   }
 
   @SubscribeMessage('mark-as-read')
