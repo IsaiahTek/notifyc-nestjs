@@ -20,3 +20,4 @@ __exportStar(require("./services/notification.service"), exports);
 __exportStar(require("./types/types"), exports);
 __exportStar(require("./decorators"), exports);
 __exportStar(require("./module"), exports);
+__exportStar(require("@synq/notifications-core"), exports);
