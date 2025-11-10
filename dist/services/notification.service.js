@@ -30,10 +30,22 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
             this.onReadyResolve = resolve;
         });
     }
+    // File: notification.service.ts (Library Code)
     async onModuleInit() {
-        await this.notificationCenter.start();
-        this.logger.log('Notification system started');
-        this.onReadyResolve();
+        this.logger.log('--- 1. onModuleInit STARTING ---'); // <--- LOG 1
+        // Check if the NotificationCenter start call is the issue
+        try {
+            await this.notificationCenter.start(); // <-- This is the suspect line
+            this.logger.log('--- 2. NotificationCenter STARTED OK ---'); // <--- LOG 2
+            this.onReadyResolve();
+            this.logger.log('--- 3. Ready Promise RESOLVED ---'); // <--- LOG 3
+        }
+        catch (e) {
+            this.logger.error('--- 🚨 CRITICAL STARTUP FAILURE ---', e);
+            // If it fails, we still need to resolve the promise to unblock the hanging HTTP request.
+            // Resolve the promise, but ensure the send() method fails gracefully later.
+            this.onReadyResolve();
+        }
     }
     async onModuleDestroy() {
         await this.notificationCenter.stop();

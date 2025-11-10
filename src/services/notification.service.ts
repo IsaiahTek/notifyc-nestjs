@@ -24,10 +24,23 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         });
     }
 
+    // File: notification.service.ts (Library Code)
+
     async onModuleInit() {
-        await this.notificationCenter.start();
-        this.logger.log('Notification system started');
-        this.onReadyResolve();
+        this.logger.log('--- 1. onModuleInit STARTING ---'); // <--- LOG 1
+
+        // Check if the NotificationCenter start call is the issue
+        try {
+            await this.notificationCenter.start(); // <-- This is the suspect line
+            this.logger.log('--- 2. NotificationCenter STARTED OK ---'); // <--- LOG 2
+            this.onReadyResolve();
+            this.logger.log('--- 3. Ready Promise RESOLVED ---'); // <--- LOG 3
+        } catch (e) {
+            this.logger.error('--- 🚨 CRITICAL STARTUP FAILURE ---', e);
+            // If it fails, we still need to resolve the promise to unblock the hanging HTTP request.
+            // Resolve the promise, but ensure the send() method fails gracefully later.
+            this.onReadyResolve();
+        }
     }
 
     async onModuleDestroy() {
@@ -89,7 +102,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     async sendBatch(inputs: NotificationInput[]): Promise<Notification[]> {
-        
+
         await this.isReady;
 
         const notifications = await this.notificationCenter.sendBatch(inputs);
@@ -103,7 +116,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     async schedule(input: NotificationInput, when: Date): Promise<string> {
-        
+
         await this.isReady;
 
         return this.notificationCenter.schedule(input, when);
@@ -133,7 +146,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     // ========== STATE OPERATIONS ==========
 
     async markAsRead(notificationId: string): Promise<void> {
-        
+
         await this.isReady;
 
         const notification = await this.notificationCenter.getById(notificationId);
@@ -184,7 +197,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
             this.notificationCenter.registerTemplate(template);
             this.logger.log(`Notification template registered: ${template.type}`);
         })
-        
+
     }
 
     // ========== SUBSCRIPTIONS ==========
