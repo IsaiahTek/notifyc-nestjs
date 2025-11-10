@@ -1,11 +1,10 @@
-import { OnModuleInit, OnModuleDestroy } from "@nestjs/common";
+import { OnModuleDestroy } from "@nestjs/common";
 import { NotificationInput, NotificationFilters, NotificationPreferences, NotificationTemplate, Unsubscribe, Notification } from "@synq/notifications-core";
-export declare class NotificationsService implements OnModuleInit, OnModuleDestroy {
+export declare class NotificationsService implements OnModuleDestroy {
     private readonly logger;
     private eventEmitter;
     private readonly notificationCenter;
     constructor();
-    onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
     onNotificationSent(callback: (notification: Notification) => void): () => void;
     onUnreadCountChanged(callback: (userId: string, count: number) => void): () => void;

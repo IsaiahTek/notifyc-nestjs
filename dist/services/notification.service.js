@@ -18,16 +18,12 @@ const common_1 = require("@nestjs/common");
 const events_1 = require("events");
 const module_1 = require("../module");
 let NotificationsService = NotificationsService_1 = class NotificationsService {
-    constructor(
-    // @Inject(NOTIFICATION_CENTER)
-    ) {
+    constructor() {
         this.logger = new common_1.Logger(NotificationsService_1.name);
         this.eventEmitter = new events_1.EventEmitter();
+        // Retrieve the globally set singleton instance
         this.notificationCenter = (0, module_1.getNotificationCenterInstance)();
-    }
-    async onModuleInit() {
-        await this.notificationCenter.start();
-        this.logger.log('Notification system started');
+        this.logger.log('NotificationsService constructor completed. Center instance retrieved statically.');
     }
     async onModuleDestroy() {
         await this.notificationCenter.stop();
@@ -46,7 +42,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     // File: notification.service.ts
     async send(input) {
         // console.log("NOTIFICATION INPUT: ", input);
-        // this.logger.log("NOTIFICATION INPUT: ", input);
+        this.logger.log("SEND NOTIFICATION TRIGGERED WITH INPUT: ", input);
         let notification;
         try {
             // 1. Await the external library's call

@@ -9,20 +9,18 @@ import { NOTIFICATION_CENTER } from "../types/types";
 import { getNotificationCenterInstance } from '../module';
 
 @Injectable()
-export class NotificationsService implements OnModuleInit, OnModuleDestroy {
+export class NotificationsService implements OnModuleDestroy {
     private readonly logger = new Logger(NotificationsService.name);
     private eventEmitter = new EventEmitter();
     
-    private readonly notificationCenter: NotificationCenter
-    constructor(
-        // @Inject(NOTIFICATION_CENTER)
-    ) {
-        this.notificationCenter = getNotificationCenterInstance();
-    }
+    // The core NotificationCenter instance is now retrieved statically,
+    // completely bypassing DI for this specific dependency.
+    private readonly notificationCenter: NotificationCenter;
 
-    async onModuleInit() {
-        await this.notificationCenter.start();
-        this.logger.log('Notification system started');
+    constructor() {
+        // Retrieve the globally set singleton instance
+        this.notificationCenter = getNotificationCenterInstance();
+        this.logger.log('NotificationsService constructor completed. Center instance retrieved statically.');
     }
 
     async onModuleDestroy() {
@@ -49,7 +47,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     async send(input: NotificationInput): Promise<Notification> {
 
         // console.log("NOTIFICATION INPUT: ", input);
-        // this.logger.log("NOTIFICATION INPUT: ", input);
+        this.logger.log("SEND NOTIFICATION TRIGGERED WITH INPUT: ", input);
 
         let notification: Notification;
 
