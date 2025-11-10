@@ -21,13 +21,35 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     constructor() {
         this.logger = new common_1.Logger(NotificationsService_1.name);
         this.eventEmitter = new events_1.EventEmitter();
-        // Retrieve the globally set singleton instance
-        this.notificationCenter = (0, module_1.getNotificationCenterInstance)();
-        this.logger.log('NotificationsService constructor completed. Center instance retrieved statically.');
+        this.notificationCenter = null;
+        this.logger.log('NotificationsService: Constructor called.');
+    }
+    async onModuleInit() {
+        this.logger.log('NotificationsService: onModuleInit called. Retrieving NotificationCenter instance...');
+        // Wait a bit to ensure the initialization provider has run
+        // This is a safety mechanism
+        await new Promise(resolve => setTimeout(resolve, 100));
+        try {
+            this.notificationCenter = (0, module_1.getNotificationCenterInstance)();
+            this.logger.log('NotificationsService: NotificationCenter instance retrieved successfully.');
+        }
+        catch (error) {
+            this.logger.error('NotificationsService: Failed to get NotificationCenter instance', error);
+            throw error;
+        }
     }
     async onModuleDestroy() {
-        await this.notificationCenter.stop();
-        this.logger.log('Notification system stopped');
+        if (this.notificationCenter) {
+            await this.notificationCenter.stop();
+            this.logger.log('Notification system stopped');
+        }
+    }
+    getCenter() {
+        if (!this.notificationCenter) {
+            // Fallback: try to get it again
+            this.notificationCenter = (0, module_1.getNotificationCenterInstance)();
+        }
+        return this.notificationCenter;
     }
     // ========== EVENT EMITTER (for WebSocket integration) ==========
     onNotificationSent(callback) {
@@ -39,97 +61,107 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         return () => this.eventEmitter.off('unread:changed', callback);
     }
     // ========== SEND OPERATIONS ==========
-    // File: notification.service.ts
     async send(input) {
-        // console.log("NOTIFICATION INPUT: ", input);
+        console.log("🔔 NotificationsService.send() CALLED");
+        console.log("📋 Input:", JSON.stringify(input, null, 2));
         this.logger.log("SEND NOTIFICATION TRIGGERED WITH INPUT: ", input);
         let notification;
         try {
-            // 1. Await the external library's call
-            notification = await this.notificationCenter.send(input);
-            // 🌟 MISSING LINE: Emit the local event for the WebSocket to pick up
-            this.eventEmitter.emit('notification:sent', notification); // <--- ADD THIS LINE
+            const center = this.getCenter();
+            console.log("✅ NotificationCenter instance obtained");
+            notification = await center.send(input);
+            console.log("✅ Notification sent successfully:", notification.id);
+            // Emit the local event for the WebSocket to pick up
+            this.eventEmitter.emit('notification:sent', notification);
+            console.log("✅ Event emitted: notification:sent");
         }
         catch (error) {
-            // 2. Catch ANY error that happens during the external call
             const errorMessage = `Failed to send notification via NotificationCenter: ${error.message}`;
-            console.error(errorMessage, error); // Use console.error for visibility
+            console.error("❌ " + errorMessage, error);
             this.logger.error(errorMessage, error.stack);
-            // Decide how to handle the error (e.g., throw it up or return null)
-            // Throwing is usually best to signal failure to the client
             throw new common_1.InternalServerErrorException('Notification sending failed.');
         }
-        // 3. This code WILL ONLY RUN if the try block succeeds
-        // console.log("NOTIFICATION SENT: ", notification);
-        // this.logger.log("NOTIFICATION SENT: ", notification);
-        // If the log is still missing, the code is hanging BEFORE the log
-        // If an ERROR LOG now appears, you've found the issue!
         return notification;
     }
     async sendBatch(inputs) {
-        const notifications = await this.notificationCenter.sendBatch(inputs);
-        // Emit event for each notification
+        const center = this.getCenter();
+        const notifications = await center.sendBatch(inputs);
         notifications.forEach(notification => {
             this.eventEmitter.emit('notification:sent', notification);
         });
         return notifications;
     }
     async schedule(input, when) {
-        return this.notificationCenter.schedule(input, when);
+        const center = this.getCenter();
+        return center.schedule(input, when);
     }
     // ========== QUERY OPERATIONS ==========
     async getForUser(userId, filters) {
-        return this.notificationCenter.getForUser(userId, filters);
+        const center = this.getCenter();
+        return center.getForUser(userId, filters);
     }
     async getById(id) {
-        return this.notificationCenter.getById(id);
+        const center = this.getCenter();
+        return center.getById(id);
     }
     async getUnreadCount(userId) {
-        return this.notificationCenter.getUnreadCount(userId);
+        const center = this.getCenter();
+        return center.getUnreadCount(userId);
     }
     async getStats(userId) {
-        return this.notificationCenter.getStats(userId);
+        const center = this.getCenter();
+        return center.getStats(userId);
     }
     // ========== STATE OPERATIONS ==========
     async markAsRead(notificationId) {
-        const notification = await this.notificationCenter.getById(notificationId);
-        await this.notificationCenter.markAsRead(notificationId);
+        const center = this.getCenter();
+        const notification = await center.getById(notificationId);
+        await center.markAsRead(notificationId);
         if (notification) {
-            const count = await this.notificationCenter.getUnreadCount(notification.userId);
+            const count = await center.getUnreadCount(notification.userId);
             this.eventEmitter.emit('unread:changed', notification.userId, count);
         }
     }
     async markAllAsRead(userId) {
-        await this.notificationCenter.markAllAsRead(userId);
+        const center = this.getCenter();
+        await center.markAllAsRead(userId);
         this.eventEmitter.emit('unread:changed', userId, 0);
     }
     async delete(notificationId) {
-        return this.notificationCenter.delete(notificationId);
+        const center = this.getCenter();
+        return center.delete(notificationId);
     }
     async deleteAll(userId) {
-        return this.notificationCenter.deleteAll(userId);
+        const center = this.getCenter();
+        return center.deleteAll(userId);
     }
     // ========== PREFERENCES ==========
     async getPreferences(userId) {
-        return this.notificationCenter.getPreferences(userId);
+        const center = this.getCenter();
+        return center.getPreferences(userId);
     }
     async updatePreferences(userId, prefs) {
-        return this.notificationCenter.updatePreferences(userId, prefs);
+        const center = this.getCenter();
+        return center.updatePreferences(userId, prefs);
     }
     // ========== TEMPLATES ==========
     registerTemplate(template) {
-        this.notificationCenter.registerTemplate(template);
+        const center = this.getCenter();
+        center.registerTemplate(template);
     }
     // ========== SUBSCRIPTIONS ==========
     subscribe(userId, callback) {
-        return this.notificationCenter.subscribe(userId, callback);
+        const center = this.getCenter();
+        return center.subscribe(userId, callback);
     }
     onUnreadCountChange(userId, callback) {
-        return this.notificationCenter.onUnreadCountChange(userId, callback);
+        const center = this.getCenter();
+        return center.onUnreadCountChange(userId, callback);
     }
     // ========== HEALTH ==========
     async healthCheck() {
-        return this.notificationCenter.healthCheck();
+        const center = this.getCenter();
+        return center.healthCheck();
     }
 };
 exports.NotificationsService = NotificationsService;

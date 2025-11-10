@@ -16,21 +16,17 @@ const notifications_websocket_gateway_1 = require("./gateways/notifications-webs
 const notifications_core_1 = require("@synq/notifications-core");
 /**
  * Stores the single initialized instance of the NotificationCenter.
- * This global static property breaks the DI chain that causes the hang.
  */
 let globalNotificationCenterInstance = null;
 /**
- * Creates the NotificationCenter instance, performs the asynchronous startup, and sets the global singleton.
- * @param options The module configuration options.
- * @returns A fully initialized NotificationCenter instance (also sets the global singleton).
+ * Creates the NotificationCenter instance and performs async startup.
  */
 async function createNotificationCenterAndSetGlobal(options) {
-    // If already initialized (e.g., in case of a recursive import attempt), return existing.
     if (globalNotificationCenterInstance) {
         console.warn('NotificationCenter: Attempted re-initialization. Returning existing instance.');
         return globalNotificationCenterInstance;
     }
-    // 1. Create the NotificationCenter instance
+    console.log('NotificationCenter: Creating new instance...');
     const center = new notifications_core_1.NotificationCenter({
         storage: options.storage,
         transports: options.transports,
@@ -39,36 +35,39 @@ async function createNotificationCenterAndSetGlobal(options) {
         cleanup: options.cleanup,
         middleware: options.middleware
     });
-    // 2. Register templates (synchronous)
+    console.log('NotificationCenter: Instance created, registering templates...');
     if (options.templates) {
         options.templates.forEach(template => {
             center.registerTemplate(template);
+            console.log(`NotificationCenter: Template registered: ${template.id}`);
         });
     }
-    // 3. CRITICAL: Await the startup here to ensure readiness before NestJS bootstrap finishes.
+    console.log('NotificationCenter: Starting center...');
     await center.start();
-    console.log('NotificationCenter: Core library started successfully and singleton set.');
-    // 4. Set the global singleton instance
+    console.log('NotificationCenter: Core library started successfully.');
     globalNotificationCenterInstance = center;
     return center;
 }
-// Export the getter for the service to use
 function getNotificationCenterInstance() {
     if (!globalNotificationCenterInstance) {
-        throw new Error("NotificationCenter is not initialized. Ensure NotificationsModule.forRoot() is called in the root module and awaited.");
+        throw new Error("NotificationCenter is not initialized. Ensure NotificationsModule.forRoot() is called.");
     }
     return globalNotificationCenterInstance;
 }
 let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
-    /**
-     * Static method for synchronous or value-based module configuration.
-     */
     static forRoot(options) {
-        // Initialization provider to start the notification center
+        // Step 1: Initialize the NotificationCenter asynchronously
         const InitializationProvider = {
             provide: 'NOTIFICATION_MODULE_INITIALIZER',
-            useFactory: async () => await createNotificationCenterAndSetGlobal(options),
+            useFactory: async () => {
+                console.log('NOTIFICATION_MODULE_INITIALIZER: Starting initialization...');
+                const center = await createNotificationCenterAndSetGlobal(options);
+                console.log('NOTIFICATION_MODULE_INITIALIZER: Initialization complete.');
+                return center;
+            },
         };
+        // Step 2: Provide NotificationsService as a regular provider
+        // It doesn't need to wait for initialization since it uses the global getter
         const providers = [
             InitializationProvider,
             notification_service_1.NotificationsService,
@@ -77,10 +76,16 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
             ? [notification_controller_1.NotificationsController]
             : [];
         const exports = [notification_service_1.NotificationsService];
-        // Add WebSocket Gateway if enabled
+        // Step 3: Add Gateway with explicit dependency injection
         if (options.enableWebSocket !== false) {
-            providers.push(notifications_websocket_gateway_1.NotificationsGateway);
-            // DON'T export the gateway - it's only used internally
+            providers.push({
+                provide: notifications_websocket_gateway_1.NotificationsGateway,
+                useFactory: (notificationsService) => {
+                    console.log('NotificationsGateway: Creating instance with injected service...');
+                    return new notifications_websocket_gateway_1.NotificationsGateway(notificationsService);
+                },
+                inject: [notification_service_1.NotificationsService],
+            });
         }
         return {
             module: NotificationsModule_1,
@@ -89,16 +94,15 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
             exports
         };
     }
-    /**
-     * Asynchronous method for configuring the module when external dependencies
-     * (like ConfigService) are needed.
-     */
     static forRootAsync(options) {
         const InitializationProvider = {
             provide: 'NOTIFICATION_MODULE_INITIALIZER_ASYNC',
             useFactory: async (...args) => {
+                console.log('NOTIFICATION_MODULE_INITIALIZER_ASYNC: Starting...');
                 const resolvedOptions = await options.useFactory?.(...args);
-                return createNotificationCenterAndSetGlobal(resolvedOptions);
+                const center = await createNotificationCenterAndSetGlobal(resolvedOptions);
+                console.log('NOTIFICATION_MODULE_INITIALIZER_ASYNC: Complete.');
+                return center;
             },
             inject: options.inject,
         };
@@ -108,8 +112,14 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
         ];
         const controllers = [notification_controller_1.NotificationsController];
         const exports = [notification_service_1.NotificationsService];
-        // Add gateway for async configuration too
-        providers.push(notifications_websocket_gateway_1.NotificationsGateway);
+        providers.push({
+            provide: notifications_websocket_gateway_1.NotificationsGateway,
+            useFactory: (notificationsService) => {
+                console.log('NotificationsGateway (async): Creating instance...');
+                return new notifications_websocket_gateway_1.NotificationsGateway(notificationsService);
+            },
+            inject: [notification_service_1.NotificationsService],
+        });
         return {
             module: NotificationsModule_1,
             imports: options.imports,
