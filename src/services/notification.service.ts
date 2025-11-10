@@ -6,16 +6,18 @@ import { Inject, Injectable, OnModuleInit, OnModuleDestroy, Logger, InternalServ
 import { NotificationCenter, NotificationInput, NotificationFilters, NotificationPreferences, NotificationTemplate, Unsubscribe, Notification } from "@synq/notifications-core";
 import { EventEmitter } from "events";
 import { NOTIFICATION_CENTER } from "../types/types";
+import { getNotificationCenterInstance } from '../module';
 
 @Injectable()
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(NotificationsService.name);
     private eventEmitter = new EventEmitter();
 
-    constructor(
-        @Inject(NOTIFICATION_CENTER)
-        private readonly notificationCenter: NotificationCenter
-    ) {}
+    private readonly notificationCenter: NotificationCenter;
+    constructor() {
+        this.notificationCenter = getNotificationCenterInstance();
+        this.logger.log('NotificationsService constructor completed. Center instance retrieved statically.');
+    }
 
     async onModuleInit() {
         await this.notificationCenter.start();

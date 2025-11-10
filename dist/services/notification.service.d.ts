@@ -1,10 +1,10 @@
 import { OnModuleInit, OnModuleDestroy } from "@nestjs/common";
-import { NotificationCenter, NotificationInput, NotificationFilters, NotificationPreferences, NotificationTemplate, Unsubscribe, Notification } from "@synq/notifications-core";
+import { NotificationInput, NotificationFilters, NotificationPreferences, NotificationTemplate, Unsubscribe, Notification } from "@synq/notifications-core";
 export declare class NotificationsService implements OnModuleInit, OnModuleDestroy {
-    private readonly notificationCenter;
     private readonly logger;
     private eventEmitter;
-    constructor(notificationCenter: NotificationCenter);
+    private readonly notificationCenter;
+    constructor();
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;
     onNotificationSent(callback: (notification: Notification) => void): () => void;

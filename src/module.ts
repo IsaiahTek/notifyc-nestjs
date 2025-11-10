@@ -6,11 +6,23 @@ import { NotificationsGateway } from './gateways/notifications-websocket.gateway
 import { NotificationCenter } from '@synq/notifications-core'; // Assuming this import path
 
 /**
- * Creates the NotificationCenter instance and performs the asynchronous startup.
- * @param options The module configuration options.
- * @returns A fully initialized NotificationCenter instance.
+ * Stores the single initialized instance of the NotificationCenter.
+ * This global static property breaks the DI chain that causes the hang.
  */
-async function createNotificationCenter(options: NotificationsModuleOptions): Promise<NotificationCenter> {
+let globalNotificationCenterInstance: NotificationCenter | null = null;
+
+/**
+ * Creates the NotificationCenter instance, performs the asynchronous startup, and sets the global singleton.
+ * @param options The module configuration options.
+ * @returns A fully initialized NotificationCenter instance (also sets the global singleton).
+ */
+async function createNotificationCenterAndSetGlobal(options: NotificationsModuleOptions): Promise<NotificationCenter> {
+    
+    // If already initialized (e.g., in case of a recursive import attempt), return existing.
+    if (globalNotificationCenterInstance) {
+        console.warn('NotificationCenter: Attempted re-initialization. Returning existing instance.');
+        return globalNotificationCenterInstance;
+    }
     
     // 1. Create the NotificationCenter instance
     const center = new NotificationCenter({
@@ -29,97 +41,97 @@ async function createNotificationCenter(options: NotificationsModuleOptions): Pr
         });
     }
 
-    // 3. CRITICAL FIX: Await the startup here! This tells NestJS to block 
-    //    bootstrap until the external core library is fully initialized.
+    // 3. CRITICAL: Await the startup here to ensure readiness before NestJS bootstrap finishes.
     await center.start(); 
-    console.log('NotificationCenter: Core library started successfully in factory.');
+    console.log('NotificationCenter: Core library started successfully and singleton set.');
+
+    // 4. Set the global singleton instance
+    globalNotificationCenterInstance = center;
 
     return center;
 }
+
+// Export the getter for the service to use
+export function getNotificationCenterInstance(): NotificationCenter {
+    if (!globalNotificationCenterInstance) {
+        throw new Error("NotificationCenter is not initialized. Ensure NotificationsModule.forRoot() is called in the root module and awaited.");
+    }
+    return globalNotificationCenterInstance;
+}
+
 
 @Global()
 @Module({})
 export class NotificationsModule {
 
-  /**
-   * Static method for synchronous or value-based module configuration.
-   * This is provided for simple, non-async configurations.
-   */
-  static forRoot(options: NotificationsModuleOptions): DynamicModule {
-    
-    const notificationCenterProvider: Provider = {
-      provide: NOTIFICATION_CENTER,
-      // We rely on the core library's adapters being non-blocking in their constructor
-      useFactory: async () => await createNotificationCenter(options),
-    };
-    
-    const providers: Provider[] = [
-      notificationCenterProvider,
-      NotificationsService,
-    ];
+    /**
+     * Static method for synchronous or value-based module configuration.
+     * This module no longer provides the NOTIFICATION_CENTER token to DI.
+     */
+    static forRoot(options: NotificationsModuleOptions): DynamicModule {
+        
+        // This is a dummy provider. We use a factory to force the async initialization to happen
+        // but we DO NOT expose the instance via a DI token.
+        const InitializationProvider: Provider = {
+            provide: 'NOTIFICATION_MODULE_INITIALIZER', // Dummy token
+            useFactory: async () => await createNotificationCenterAndSetGlobal(options),
+        };
+        
+        const providers: Provider[] = [
+            InitializationProvider,
+            NotificationsService,
+        ];
 
-    const controllers = options.enableRestApi !== false 
-      ? [NotificationsController] 
-      : [];
+        const controllers = options.enableRestApi !== false 
+            ? [NotificationsController] 
+            : [];
 
-    let exports: any[] = [NotificationsService, NOTIFICATION_CENTER];
-    
-    if (options.enableWebSocket !== false) {
-      providers.push(NotificationsGateway);
-      // Gateways are not exported, as requested.
+        // We only export the service class itself. The service will use the global getter.
+        let exports: any[] = [NotificationsService]; 
+        
+        if (options.enableWebSocket !== false) {
+            providers.push(NotificationsGateway);
+        }
+
+        return {
+            module: NotificationsModule,
+            providers,
+            controllers,
+            exports
+        };
     }
+    
+    /**
+     * Asynchronous method for configuring the module when external dependencies 
+     * (like ConfigService) are needed.
+     */
+    static forRootAsync(options: NotificationsModuleAsyncOptions): DynamicModule {
+        
+        const InitializationProvider: Provider = {
+            provide: 'NOTIFICATION_MODULE_INITIALIZER_ASYNC', // Dummy token
+            useFactory: async (...args: any[]) => {
+                const resolvedOptions = await options.useFactory?.(...args);
+                return createNotificationCenterAndSetGlobal(resolvedOptions!);
+            },
+            inject: options.inject,
+            // imports: options.imports
+        };
+        
+        const providers: Provider[] = [
+            InitializationProvider,
+            NotificationsService,
+        ];
+        
+        const controllers = [NotificationsController];
+        const exports: any[] = [NotificationsService]; 
+        providers.push(NotificationsGateway);
 
-    return {
-      module: NotificationsModule,
-      providers,
-      controllers,
-      exports
-    };
-  }
-  
-  /**
-   * Asynchronous method for configuring the module when external dependencies 
-   * (like ConfigService) are needed. This should be the preferred method.
-   */
-  static forRootAsync(options: NotificationsModuleAsyncOptions): DynamicModule {
-    
-    const notificationCenterProvider: Provider = {
-      provide: NOTIFICATION_CENTER,
-      // The useFactory function will now be injected with the requested modules
-      useFactory: async (...args: any[]) => {
-        // Map the options back from the injected arguments if necessary, 
-        // but typically the entire resolved config object is returned by the options factory.
-        const resolvedOptions = await options.useFactory?.(...args);
-        return createNotificationCenter(resolvedOptions!);
-      },
-      inject: options.inject,
-      // imports: options.imports,
-    };
-    
-    const providers: Provider[] = [
-      notificationCenterProvider,
-      NotificationsService,
-    ];
-
-    // NOTE: If using forRootAsync, options.useFactory must return NotificationsModuleOptions
-    // We cannot reliably access options.enableRestApi here without a specific Inject token.
-    // For simplicity, we assume REST and WS are enabled for Async setup, or you
-    // will need to pass config into the factory.
-    
-    // For now, we assume you'll handle controller/gateway conditional logic based on configuration
-    // *inside* your options factory if you need to disable them for async.
-    
-    const controllers = [NotificationsController]; // Assume enabled
-    const exports: any[] = [NotificationsService, NOTIFICATION_CENTER];
-    
-    providers.push(NotificationsGateway); // Assume enabled
-
-    return {
-      module: NotificationsModule,
-      imports: options.imports,
-      providers,
-      controllers,
-      exports
-    };
-  }
+        return {
+            module: NotificationsModule,
+            imports: options.imports,
+            providers,
+            controllers,
+            exports
+        };
+    }
 }
