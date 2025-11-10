@@ -1,15 +1,12 @@
-// ============================================================================
-// WEBSOCKET GATEWAY
-// ============================================================================
-import { Logger, OnModuleInit } from '@nestjs/common';
+import { Logger, OnModuleInit, UnauthorizedException } from '@nestjs/common';
 import {
   WebSocketGateway,
   WebSocketServer,
-  SubscribeMessage,
   OnGatewayConnection,
   OnGatewayDisconnect,
   ConnectedSocket,
   MessageBody,
+  SubscribeMessage,
 } from '@nestjs/websockets';
 import { NotificationsService } from '../services/notification.service';
 import { Unsubscribe } from '@synq/notifications-core';
@@ -22,8 +19,8 @@ import { Server, Socket } from 'socket.io';
 export class NotificationsGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
   private readonly logger = new Logger(NotificationsGateway.name);
-  private clientSubscriptions = new Map<string, Unsubscribe[]>();
-  private userToClients = new Map<string, Set<string>>(); // userId -> Set of socket.ids
+  // Maps user ID to a set of their connected socket IDs for broadcasting
+  private userToClients = new Map<string, Set<string>>(); 
 
   @WebSocketServer()
   server!: Server;
@@ -31,42 +28,37 @@ export class NotificationsGateway
   constructor(private readonly notificationsService: NotificationsService) { }
 
   onModuleInit() {
-    // This is the KEY fix - Subscribe to ALL notifications globally
-    // and broadcast to connected clients for that user
-    this.notificationsService.subscribe('*', (notification) => {
-      console.log("ABOUT TO BROADCAST NOTIFICATION VIA WEBSOCKET TO USER: ", notification.userId)
-      this.broadcastToUser(notification.userId, 'notification', {
-        type: 'notification',
-        notification
-      });
-    });
+    this.logger.log('WebSocket gateway initialization start.');
 
-    // 2. LISTEN TO THE LOCAL SERVICE EVENT EMITTER (via Service's onNotificationSent)
-    // This catches the immediate manual emit() from the NotificationsService.send() method.
+    // 1. Subscribe to the Service's internal event emitter for immediate broadcasts.
+    // This listener is triggered by NotificationsService.send() after persistence.
     this.notificationsService.onNotificationSent((notification) => {
-      console.log("⚡ Local Emitter: Broadcast triggered for: ", notification.userId);
+      this.logger.verbose(`Local Emitter triggered for new notification: ${notification.id} (User: ${notification.userId})`);
       this.broadcastToUser(notification.userId, 'notification', {
         type: 'notification',
         notification
       });
     });
 
-    // Subscribe to unread count changes for all users
+    // 2. Subscribe to unread count changes for all users, relying on the core library's change detection.
     this.notificationsService.onUnreadCountChange('*', (count, userId) => {
+      this.logger.verbose(`Unread count changed for user ${userId}: ${count}`);
       this.broadcastToUser(userId, 'unread-count', {
         type: 'unread-count',
         count
       });
     });
 
-    this.logger.log('WebSocket gateway initialized with global subscriptions');
+    this.logger.log('WebSocket gateway initialized with event listeners.');
   }
 
   handleConnection(client: Socket) {
+    // NOTE: In a production environment, 'userId' should be securely obtained 
+    // from a validated JWT/session token, not query params.
     const userId = client.handshake.query.userId as string;
 
     if (!userId) {
-      this.logger.warn('Client connected without userId');
+      this.logger.warn(`Client connected from ${client.handshake.address} without userId. Disconnecting.`);
       client.disconnect();
       return;
     }
@@ -82,72 +74,60 @@ export class NotificationsGateway
     // Store userId on socket for easy access
     (client as any).userId = userId;
 
-    // Send initial data
+    // Send initial data immediately upon connection
     this.sendInitialData(client, userId);
   }
 
   handleDisconnect(client: Socket) {
     const userId = (client as any).userId;
+    if (!userId) return;
+
     this.logger.log(`Client disconnected: ${client.id} (userId: ${userId})`);
 
     // Remove client from user's client list
-    if (userId) {
-      const clients = this.userToClients.get(userId);
-      if (clients) {
-        clients.delete(client.id);
-        if (clients.size === 0) {
-          this.userToClients.delete(userId);
-        }
+    const clients = this.userToClients.get(userId);
+    if (clients) {
+      clients.delete(client.id);
+      if (clients.size === 0) {
+        this.userToClients.delete(userId);
       }
     }
   }
 
-  // File: notifications-websocket.gateway.ts
-
-  // File: notifications-websocket.gateway.ts
-
-  // File: notifications-websocket.gateway.ts
-
-  // File: notifications-websocket.gateway.ts
-
-  // File: notifications-websocket.gateway.ts
-
   private broadcastToUser(userId: string, event: string, data: any) {
-    if (!this.server) {
+    const namespace = this.server; 
+
+    if (!namespace) {
       this.logger.error('WebSocket server (Namespace) not initialized. Skipping broadcast.');
       return;
     }
 
-    // 1. Assign the injected instance to a safe variable
-    const namespace = this.server;
-
-    // 2. We are going to access the client map directly from the namespace.sockets property.
-    // We cast to 'any' here to bypass the faulty TypeScript definition that requires the double 'sockets'.
-    const clientMap = namespace.sockets as any;
-
-    // Guard against the client map itself not being initialized
-    if (!clientMap) {
-      this.logger.error('Namespace client map not ready. Skipping broadcast.');
-      return;
-    }
-
     const clientIds = this.userToClients.get(userId);
-    if (!clientIds || clientIds.size === 0) return;
+    if (!clientIds || clientIds.size === 0) {
+        this.logger.verbose(`No active clients found for user ${userId}. Skipping broadcast.`);
+        return;
+    }
 
     // Defer the execution to the next tick for stability
     process.nextTick(() => {
-
+      // Access the socket instance from the namespace's connected sockets map
       clientIds.forEach(clientId => {
-        // 🌟 THE FIX: Use the single access point: clientMap.get(clientId)
-        const socket = clientMap.get(clientId);
+        const socket = (namespace.sockets as any).get(clientId);
 
         if (socket) {
           socket.emit(event, data);
-          this.logger.log(`✅ SENT ${event} to client: ${clientId}`);
+          this.logger.verbose(`SENT ${event} to client: ${clientId} (User: ${userId})`);
         } else {
-          this.logger.warn(`Socket ID ${clientId} not found for user ${userId}.`);
+          // Clean up missing ID
+          clientIds.delete(clientId);
+          this.logger.warn(`Socket ID ${clientId} not found for user ${userId}. Cleaning up map.`);
         }
       });
+      
+      // Post-cleanup check
+      if (clientIds.size === 0) {
+        this.userToClients.delete(userId);
+      }
     });
   }
 
@@ -156,8 +136,10 @@ export class NotificationsGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { notificationId: string }
   ) {
-    await this.notificationsService.markAsRead(data.notificationId);
-    return { success: true };
+    // The service handles emitting the 'unread:changed' event after the update
+    await this.notificationsService.markAsRead(data.notificationId); 
+    // Return a status to the client that requested the action
+    return { event: 'status', success: true, message: 'Notification marked as read.' }; 
   }
 
   @SubscribeMessage('mark-all-read')
@@ -165,8 +147,13 @@ export class NotificationsGateway
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userId: string }
   ) {
+    const clientUserId = (client as any).userId;
+    if (clientUserId !== data.userId) {
+        throw new UnauthorizedException('Cannot mark all notifications for another user.');
+    }
+    
     await this.notificationsService.markAllAsRead(data.userId);
-    return { success: true };
+    return { event: 'status', success: true, message: 'All notifications marked as read.' };
   }
 
   @SubscribeMessage('delete')
@@ -175,7 +162,7 @@ export class NotificationsGateway
     @MessageBody() data: { notificationId: string }
   ) {
     await this.notificationsService.delete(data.notificationId);
-    return { success: true };
+    return { event: 'status', success: true, message: 'Notification deleted.' };
   }
 
   private async sendInitialData(client: Socket, userId: string) {
@@ -189,6 +176,7 @@ export class NotificationsGateway
         notifications,
         unreadCount
       });
+      this.logger.verbose(`Sent initial data to client ${client.id}`);
     } catch (error) {
       this.logger.error('Failed to send initial data', error);
     }

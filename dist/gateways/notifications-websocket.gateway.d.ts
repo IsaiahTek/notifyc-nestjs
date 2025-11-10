@@ -5,7 +5,6 @@ import { Server, Socket } from 'socket.io';
 export declare class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
     private readonly notificationsService;
     private readonly logger;
-    private clientSubscriptions;
     private userToClients;
     server: Server;
     constructor(notificationsService: NotificationsService);
@@ -16,17 +15,23 @@ export declare class NotificationsGateway implements OnGatewayConnection, OnGate
     handleMarkAsRead(client: Socket, data: {
         notificationId: string;
     }): Promise<{
+        event: string;
         success: boolean;
+        message: string;
     }>;
     handleMarkAllAsRead(client: Socket, data: {
         userId: string;
     }): Promise<{
+        event: string;
         success: boolean;
+        message: string;
     }>;
     handleDelete(client: Socket, data: {
         notificationId: string;
     }): Promise<{
+        event: string;
         success: boolean;
+        message: string;
     }>;
     private sendInitialData;
 }
