@@ -34,6 +34,7 @@ export class NotificationsGateway
     // This is the KEY fix - Subscribe to ALL notifications globally
     // and broadcast to connected clients for that user
     this.notificationsService.subscribe('*', (notification) => {
+      console.log("ABOUT TO BROADCAST NOTIFICATION VIA WEBSOCKET TO USER: ", notification.userId)
       this.broadcastToUser(notification.userId, 'notification', {
         type: 'notification',
         notification

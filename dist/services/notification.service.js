@@ -47,8 +47,8 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     // ========== SEND OPERATIONS ==========
     // File: notification.service.ts
     async send(input) {
-        console.log("NOTIFICATION INPUT: ", input);
-        this.logger.log("NOTIFICATION INPUT: ", input);
+        // console.log("NOTIFICATION INPUT: ", input);
+        // this.logger.log("NOTIFICATION INPUT: ", input);
         let notification;
         try {
             // 1. Await the external library's call
@@ -64,8 +64,8 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
             throw new common_1.InternalServerErrorException('Notification sending failed.');
         }
         // 3. This code WILL ONLY RUN if the try block succeeds
-        console.log("NOTIFICATION SENT: ", notification);
-        this.logger.log("NOTIFICATION SENT: ", notification);
+        // console.log("NOTIFICATION SENT: ", notification);
+        // this.logger.log("NOTIFICATION SENT: ", notification);
         // If the log is still missing, the code is hanging BEFORE the log
         // If an ERROR LOG now appears, you've found the issue!
         return notification;

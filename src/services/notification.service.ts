@@ -42,38 +42,38 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     // ========== SEND OPERATIONS ==========
 
     // File: notification.service.ts
-    
+
     async send(input: NotificationInput): Promise<Notification> {
-  
-        console.log("NOTIFICATION INPUT: ", input);
-    this.logger.log("NOTIFICATION INPUT: ", input);
-  
-    let notification: Notification;
-    
-    try {
-        // 1. Await the external library's call
-        notification = await this.notificationCenter.send(input); 
 
-    } catch (error: any) {
-        // 2. Catch ANY error that happens during the external call
-        const errorMessage = `Failed to send notification via NotificationCenter: ${error.message}`;
-        console.error(errorMessage, error); // Use console.error for visibility
-        this.logger.error(errorMessage, error.stack);
-        
-        // Decide how to handle the error (e.g., throw it up or return null)
-        // Throwing is usually best to signal failure to the client
-        throw new InternalServerErrorException('Notification sending failed.'); 
+        // console.log("NOTIFICATION INPUT: ", input);
+        // this.logger.log("NOTIFICATION INPUT: ", input);
+
+        let notification: Notification;
+
+        try {
+            // 1. Await the external library's call
+            notification = await this.notificationCenter.send(input);
+
+        } catch (error: any) {
+            // 2. Catch ANY error that happens during the external call
+            const errorMessage = `Failed to send notification via NotificationCenter: ${error.message}`;
+            console.error(errorMessage, error); // Use console.error for visibility
+            this.logger.error(errorMessage, error.stack);
+
+            // Decide how to handle the error (e.g., throw it up or return null)
+            // Throwing is usually best to signal failure to the client
+            throw new InternalServerErrorException('Notification sending failed.');
+        }
+
+        // 3. This code WILL ONLY RUN if the try block succeeds
+        // console.log("NOTIFICATION SENT: ", notification);
+        // this.logger.log("NOTIFICATION SENT: ", notification);
+
+        // If the log is still missing, the code is hanging BEFORE the log
+        // If an ERROR LOG now appears, you've found the issue!
+
+        return notification;
     }
-
-    // 3. This code WILL ONLY RUN if the try block succeeds
-    console.log("NOTIFICATION SENT: ", notification);
-    this.logger.log("NOTIFICATION SENT: ", notification);
-
-    // If the log is still missing, the code is hanging BEFORE the log
-    // If an ERROR LOG now appears, you've found the issue!
-    
-    return notification;
-}
 
     async sendBatch(inputs: NotificationInput[]): Promise<Notification[]> {
         const notifications = await this.notificationCenter.sendBatch(inputs);
