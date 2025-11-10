@@ -46,7 +46,10 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
         const providers = [
             optionsProvider,
             notificationCenterProvider,
-            notification_service_1.NotificationsService
+            {
+                provide: notification_service_1.NotificationsService,
+                useValue: (0, common_1.forwardRef)(() => notification_service_1.NotificationsService)
+            }
         ];
         const controllers = options.enableRestApi !== false
             ? [notification_controller_1.NotificationsController]

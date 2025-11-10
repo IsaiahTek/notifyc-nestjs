@@ -2,7 +2,7 @@
 // NOTIFICATIONS MODULE
 // ============================================================================
 
-import { Global, Module, DynamicModule, Provider } from "@nestjs/common";
+import { Global, Module, DynamicModule, Provider, forwardRef } from "@nestjs/common";
 import { NotificationsController } from "./controllers/notification.controller";
 import { NotificationsGateway } from "./gateways/notifications-websocket.gateway";
 import { NotificationsService } from "./services/notification.service";
@@ -44,7 +44,10 @@ export class NotificationsModule {
     const providers: Provider[] = [
       optionsProvider,
       notificationCenterProvider,
-      NotificationsService
+      {
+        provide: NotificationsService,
+        useValue: forwardRef(()=>NotificationsService)
+      }
     ];
 
     const controllers = options.enableRestApi !== false 
