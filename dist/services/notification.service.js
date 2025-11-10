@@ -66,6 +66,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         await this.isReady;
         // console.log("NOTIFICATION INPUT: ", input);
         // this.logger.log("NOTIFICATION INPUT: ", input);
+        this.logger.log(`--- 4. SEND METHOD RESUMED. Calling NotificationCenter.send()... ---`); // <--- MUST ADD THIS LOG
         let notification;
         try {
             // 1. Await the external library's call

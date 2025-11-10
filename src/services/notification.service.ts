@@ -70,6 +70,8 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
         // console.log("NOTIFICATION INPUT: ", input);
         // this.logger.log("NOTIFICATION INPUT: ", input);
+        
+        this.logger.log(`--- 4. SEND METHOD RESUMED. Calling NotificationCenter.send()... ---`); // <--- MUST ADD THIS LOG
 
         let notification: Notification;
 
