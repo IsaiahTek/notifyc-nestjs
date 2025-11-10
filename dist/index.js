@@ -1,4 +1,5 @@
 "use strict";
+// export * from '@synq/notifications-core';
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     var desc = Object.getOwnPropertyDescriptor(m, k);
@@ -20,4 +21,3 @@ __exportStar(require("./services/notification.service"), exports);
 __exportStar(require("./types/types"), exports);
 __exportStar(require("./decorators"), exports);
 __exportStar(require("./module"), exports);
-__exportStar(require("@synq/notifications-core"), exports);

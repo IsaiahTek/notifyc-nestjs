@@ -4,4 +4,3 @@ export * from './services/notification.service';
 export * from './types/types';
 export * from './decorators';
 export * from './module';
-export * from '@synq/notifications-core';
