@@ -48,6 +48,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         // this.eventEmitter.emit('notification:sent', notification);
 
         console.log("NOTIFICATION SENT: ", notification);
+        this.logger.log("NOTIFICATION SENT: ", notification);
 
         return notification;
     }

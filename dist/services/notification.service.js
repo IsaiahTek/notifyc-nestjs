@@ -50,6 +50,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         // // Emit event for WebSocket to pick up
         // this.eventEmitter.emit('notification:sent', notification);
         console.log("NOTIFICATION SENT: ", notification);
+        this.logger.log("NOTIFICATION SENT: ", notification);
         return notification;
     }
     async sendBatch(inputs) {
