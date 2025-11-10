@@ -3,7 +3,7 @@ import { NotificationsModuleOptions, NotificationsModuleAsyncOptions, NOTIFICATI
 import { NotificationsController } from './controllers/notification.controller';
 import { NotificationsService } from './services/notification.service';
 import { NotificationsGateway } from './gateways/notifications-websocket.gateway';
-import { NotificationCenter } from '@synq/notifications-core'; // Assuming this import path
+import { NotificationCenter } from '@synq/notifications-core';
 
 /**
  * Stores the single initialized instance of the NotificationCenter.
@@ -66,14 +66,12 @@ export class NotificationsModule {
 
     /**
      * Static method for synchronous or value-based module configuration.
-     * This module no longer provides the NOTIFICATION_CENTER token to DI.
      */
     static forRoot(options: NotificationsModuleOptions): DynamicModule {
 
-        // This is a dummy provider. We use a factory to force the async initialization to happen
-        // but we DO NOT expose the instance via a DI token.
+        // Initialization provider to start the notification center
         const InitializationProvider: Provider = {
-            provide: 'NOTIFICATION_MODULE_INITIALIZER', // Dummy token
+            provide: 'NOTIFICATION_MODULE_INITIALIZER',
             useFactory: async () => await createNotificationCenterAndSetGlobal(options),
         };
 
@@ -86,18 +84,12 @@ export class NotificationsModule {
             ? [NotificationsController]
             : [];
 
-        // We only export the service class itself. The service will use the global getter.
-        let exports: any[] = [NotificationsService];
+        const exports: any[] = [NotificationsService];
 
+        // Add WebSocket Gateway if enabled
         if (options.enableWebSocket !== false) {
-            providers.push({
-                provide: NotificationsGateway,
-                useFactory: (notificationsService: NotificationsService) => {
-                    // Manually instantiate the class using the injected service
-                    return new NotificationsGateway(notificationsService);
-                },
-                inject: [NotificationsService], // Explicitly declare the required dependency
-            });
+            providers.push(NotificationsGateway);
+            // DON'T export the gateway - it's only used internally
         }
 
         return {
@@ -115,13 +107,12 @@ export class NotificationsModule {
     static forRootAsync(options: NotificationsModuleAsyncOptions): DynamicModule {
 
         const InitializationProvider: Provider = {
-            provide: 'NOTIFICATION_MODULE_INITIALIZER_ASYNC', // Dummy token
+            provide: 'NOTIFICATION_MODULE_INITIALIZER_ASYNC',
             useFactory: async (...args: any[]) => {
                 const resolvedOptions = await options.useFactory?.(...args);
                 return createNotificationCenterAndSetGlobal(resolvedOptions!);
             },
             inject: options.inject,
-            // imports: options.imports
         };
 
         const providers: Provider[] = [
@@ -131,6 +122,8 @@ export class NotificationsModule {
 
         const controllers = [NotificationsController];
         const exports: any[] = [NotificationsService];
+
+        // Add gateway for async configuration too
         providers.push(NotificationsGateway);
 
         return {

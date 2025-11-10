@@ -13,7 +13,7 @@ const common_1 = require("@nestjs/common");
 const notification_controller_1 = require("./controllers/notification.controller");
 const notification_service_1 = require("./services/notification.service");
 const notifications_websocket_gateway_1 = require("./gateways/notifications-websocket.gateway");
-const notifications_core_1 = require("@synq/notifications-core"); // Assuming this import path
+const notifications_core_1 = require("@synq/notifications-core");
 /**
  * Stores the single initialized instance of the NotificationCenter.
  * This global static property breaks the DI chain that causes the hang.
@@ -62,13 +62,11 @@ function getNotificationCenterInstance() {
 let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
     /**
      * Static method for synchronous or value-based module configuration.
-     * This module no longer provides the NOTIFICATION_CENTER token to DI.
      */
     static forRoot(options) {
-        // This is a dummy provider. We use a factory to force the async initialization to happen
-        // but we DO NOT expose the instance via a DI token.
+        // Initialization provider to start the notification center
         const InitializationProvider = {
-            provide: 'NOTIFICATION_MODULE_INITIALIZER', // Dummy token
+            provide: 'NOTIFICATION_MODULE_INITIALIZER',
             useFactory: async () => await createNotificationCenterAndSetGlobal(options),
         };
         const providers = [
@@ -78,17 +76,11 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
         const controllers = options.enableRestApi !== false
             ? [notification_controller_1.NotificationsController]
             : [];
-        // We only export the service class itself. The service will use the global getter.
-        let exports = [notification_service_1.NotificationsService];
+        const exports = [notification_service_1.NotificationsService];
+        // Add WebSocket Gateway if enabled
         if (options.enableWebSocket !== false) {
-            providers.push({
-                provide: notifications_websocket_gateway_1.NotificationsGateway,
-                useFactory: (notificationsService) => {
-                    // Manually instantiate the class using the injected service
-                    return new notifications_websocket_gateway_1.NotificationsGateway(notificationsService);
-                },
-                inject: [notification_service_1.NotificationsService], // Explicitly declare the required dependency
-            });
+            providers.push(notifications_websocket_gateway_1.NotificationsGateway);
+            // DON'T export the gateway - it's only used internally
         }
         return {
             module: NotificationsModule_1,
@@ -103,13 +95,12 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
      */
     static forRootAsync(options) {
         const InitializationProvider = {
-            provide: 'NOTIFICATION_MODULE_INITIALIZER_ASYNC', // Dummy token
+            provide: 'NOTIFICATION_MODULE_INITIALIZER_ASYNC',
             useFactory: async (...args) => {
                 const resolvedOptions = await options.useFactory?.(...args);
                 return createNotificationCenterAndSetGlobal(resolvedOptions);
             },
             inject: options.inject,
-            // imports: options.imports
         };
         const providers = [
             InitializationProvider,
@@ -117,6 +108,7 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
         ];
         const controllers = [notification_controller_1.NotificationsController];
         const exports = [notification_service_1.NotificationsService];
+        // Add gateway for async configuration too
         providers.push(notifications_websocket_gateway_1.NotificationsGateway);
         return {
             module: NotificationsModule_1,
