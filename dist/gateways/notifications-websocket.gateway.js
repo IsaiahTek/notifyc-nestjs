@@ -88,12 +88,19 @@ let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
             }
         }
     }
+    // File: notifications-websocket.gateway.ts
     broadcastToUser(userId, event, data) {
+        // 🌟 THE FIX: Ensure this.server is defined before proceeding
+        if (!this.server) {
+            this.logger.error('WebSocket server not initialized. Skipping broadcast.');
+            return;
+        }
         const clientIds = this.userToClients.get(userId);
         if (!clientIds || clientIds.size === 0)
             return;
         // Broadcast to all connected clients for this user
         clientIds.forEach(clientId => {
+            // The error point is now safe
             const socket = this.server.sockets.sockets.get(clientId);
             if (socket) {
                 socket.emit(event, data);

@@ -44,11 +44,11 @@ export class NotificationsGateway
     // 2. LISTEN TO THE LOCAL SERVICE EVENT EMITTER (via Service's onNotificationSent)
     // This catches the immediate manual emit() from the NotificationsService.send() method.
     this.notificationsService.onNotificationSent((notification) => {
-        console.log("⚡ Local Emitter: Broadcast triggered for: ", notification.userId);
-        this.broadcastToUser(notification.userId, 'notification', {
-            type: 'notification',
-            notification
-        });
+      console.log("⚡ Local Emitter: Broadcast triggered for: ", notification.userId);
+      this.broadcastToUser(notification.userId, 'notification', {
+        type: 'notification',
+        notification
+      });
     });
 
     // Subscribe to unread count changes for all users
@@ -102,12 +102,22 @@ export class NotificationsGateway
     }
   }
 
+  // File: notifications-websocket.gateway.ts
+
   private broadcastToUser(userId: string, event: string, data: any) {
+
+    // 🌟 THE FIX: Ensure this.server is defined before proceeding
+    if (!this.server) {
+      this.logger.error('WebSocket server not initialized. Skipping broadcast.');
+      return;
+    }
+
     const clientIds = this.userToClients.get(userId);
     if (!clientIds || clientIds.size === 0) return;
 
     // Broadcast to all connected clients for this user
     clientIds.forEach(clientId => {
+      // The error point is now safe
       const socket = this.server.sockets.sockets.get(clientId);
       if (socket) {
         socket.emit(event, data);
