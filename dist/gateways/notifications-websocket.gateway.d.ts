@@ -1,13 +1,14 @@
 import { OnModuleInit } from '@nestjs/common';
-import { OnGatewayConnection, OnGatewayDisconnect } from '@nestjs/websockets';
+import { OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit } from '@nestjs/websockets';
 import { NotificationsService } from '../services/notification.service';
 import { Server, Socket } from 'socket.io';
-export declare class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect, OnModuleInit {
+export declare class NotificationsGateway implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, OnModuleInit {
     private readonly notificationsService;
     private readonly logger;
     private userToClients;
     server: Server;
     constructor(notificationsService: NotificationsService);
+    afterInit(server: Server): void;
     onModuleInit(): void;
     handleConnection(client: Socket): void;
     handleDisconnect(client: Socket): void;
