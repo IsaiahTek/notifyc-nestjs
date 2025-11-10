@@ -31,8 +31,16 @@ export class NotificationsGateway
   }
 
   afterInit(server: Server) {
-    this.logger.log('WebSocket server initialized (afterInit hook)');
-    this.logger.log(`Server instance available: ${!!server}`);
+    this.logger.log('🚀 WebSocket server initialized (afterInit hook)');
+    this.logger.log(`🚀 Server instance available: ${!!server}`);
+    this.logger.log(`🚀 Server.sockets available: ${!!server?.sockets}`);
+    this.logger.log(`🚀 this.server available: ${!!this.server}`);
+    
+    // Force set the server if needed
+    if (server && !this.server) {
+      this.server = server;
+      this.logger.log('🚀 Server manually assigned');
+    }
   }
 
   onModuleInit() {

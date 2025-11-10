@@ -95,18 +95,11 @@ export class NotificationsModule {
 
         const exports: any[] = [NotificationsService];
 
-        // Step 3: Add Gateway with explicit dependency injection
+        // Step 3: Add Gateway as a normal provider (not factory)
+        // This ensures NestJS properly initializes it as a WebSocket gateway
         if (options.enableWebSocket !== false) {
             console.log('📦 Adding WebSocket Gateway...');
-            providers.push({
-                provide: NotificationsGateway,
-                useFactory: (notificationsService: NotificationsService) => {
-                    console.log('🌐 NotificationsGateway: Creating instance with injected service...');
-                    console.log('🌐 Service available:', !!notificationsService);
-                    return new NotificationsGateway(notificationsService);
-                },
-                inject: [NotificationsService],
-            });
+            providers.push(NotificationsGateway);
         }
 
         console.log('✅ NotificationsModule.forRoot() configuration complete');
