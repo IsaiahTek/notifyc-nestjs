@@ -62,7 +62,7 @@ export class NotificationsModule {
       providers.push(NotificationsGateway);
       // FIX: Also export it if consumers need to inject it (though often
       // not needed for a Gateway, but safe for completeness)
-      exports.push(NotificationsGateway);
+      // exports.push(NotificationsGateway);
     }
     
     // FIX: The issue might have been with the original logic's flow leading

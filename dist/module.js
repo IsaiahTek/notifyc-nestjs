@@ -61,7 +61,7 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
             providers.push(notifications_websocket_gateway_1.NotificationsGateway);
             // FIX: Also export it if consumers need to inject it (though often
             // not needed for a Gateway, but safe for completeness)
-            exports.push(notifications_websocket_gateway_1.NotificationsGateway);
+            // exports.push(NotificationsGateway);
         }
         // FIX: The issue might have been with the original logic's flow leading
         // to an incorrect `providers` array in the final return object.
