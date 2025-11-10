@@ -14,6 +14,7 @@ var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
 Object.defineProperty(exports, "__esModule", { value: true });
+exports.NotificationsGatewayModule = void 0;
 __exportStar(require("@synq/notifications-core"), exports);
 __exportStar(require("./controllers/notification.controller"), exports);
 __exportStar(require("./gateways/notifications-websocket.gateway"), exports);
@@ -21,3 +22,5 @@ __exportStar(require("./services/notification.service"), exports);
 __exportStar(require("./types/types"), exports);
 __exportStar(require("./decorators"), exports);
 __exportStar(require("./module"), exports);
+var module_1 = require("./module");
+Object.defineProperty(exports, "NotificationsGatewayModule", { enumerable: true, get: function () { return module_1.NotificationsGatewayModule; } });

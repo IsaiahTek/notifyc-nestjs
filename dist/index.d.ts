@@ -5,3 +5,4 @@ export * from './services/notification.service';
 export * from './types/types';
 export * from './decorators';
 export * from './module';
+export { NotificationsGatewayModule } from './module';

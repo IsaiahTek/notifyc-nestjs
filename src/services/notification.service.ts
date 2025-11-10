@@ -2,7 +2,7 @@
 // NOTIFICATION SERVICE
 // ============================================================================
 
-import { Inject, Injectable, OnModuleInit, OnModuleDestroy, Logger, InternalServerErrorException } from "@nestjs/common";
+import { Injectable, OnModuleInit, OnModuleDestroy, Logger, InternalServerErrorException } from "@nestjs/common";
 import { NotificationCenter, NotificationInput, NotificationFilters, NotificationPreferences, NotificationTemplate, Unsubscribe, Notification } from "@synq/notifications-core";
 import { EventEmitter } from "events";
 import { NOTIFICATION_CENTER } from "../types/types";
