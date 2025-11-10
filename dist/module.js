@@ -81,7 +81,14 @@ let NotificationsModule = NotificationsModule_1 = class NotificationsModule {
         // We only export the service class itself. The service will use the global getter.
         let exports = [notification_service_1.NotificationsService];
         if (options.enableWebSocket !== false) {
-            providers.push(notifications_websocket_gateway_1.NotificationsGateway);
+            providers.push({
+                provide: notifications_websocket_gateway_1.NotificationsGateway,
+                useFactory: (notificationsService) => {
+                    // Manually instantiate the class using the injected service
+                    return new notifications_websocket_gateway_1.NotificationsGateway(notificationsService);
+                },
+                inject: [notification_service_1.NotificationsService], // Explicitly declare the required dependency
+            });
         }
         return {
             module: NotificationsModule_1,
