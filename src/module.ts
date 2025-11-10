@@ -2,7 +2,7 @@
 // NOTIFICATIONS MODULE
 // ============================================================================
 
-import { Global, Module, DynamicModule, Provider, forwardRef } from "@nestjs/common";
+import { Global, Module, DynamicModule, Provider } from "@nestjs/common";
 import { NotificationsController } from "./controllers/notification.controller";
 import { NotificationsGateway } from "./gateways/notifications-websocket.gateway";
 import { NotificationsService } from "./services/notification.service";
@@ -14,9 +14,11 @@ import { NotificationCenter } from "@synq/notifications-core";
 export class NotificationsModule {
   static forRoot(options: NotificationsModuleOptions): DynamicModule {
     const notificationCenterProvider: Provider = {
+      // ... (definition remains the same)
       provide: NOTIFICATION_CENTER,
       useFactory: () => {
         const center = new NotificationCenter({
+          // ... (config remains the same)
           storage: options.storage,
           transports: options.transports,
           queue: options.queue,
@@ -41,58 +43,40 @@ export class NotificationsModule {
       useValue: options
     };
 
-    const providers: Provider[] = [
+    let providers: Provider[] = [
       optionsProvider,
       notificationCenterProvider,
-      {
-        provide: NotificationsService,
-        useValue: forwardRef(()=>NotificationsService)
-      }
+      NotificationsService // Base Service is always a provider
     ];
 
-    const controllers = options.enableRestApi !== false 
-      ? [NotificationsController] 
+    const controllers = options.enableRestApi !== false
+      ? [NotificationsController]
       : [];
 
-    const exports: any[] = [NotificationsService, NOTIFICATION_CENTER];
+    let exports: any[] = [NotificationsService, NOTIFICATION_CENTER];
 
     // Add WebSocket gateway if enabled
     if (options.enableWebSocket !== false) {
+      // FIX: Add the Gateway to PROVIDERS, as it is a class that needs
+      // to be instantiated for its functionality (like a service/component)
       providers.push(NotificationsGateway);
+      // FIX: Also export it if consumers need to inject it (though often
+      // not needed for a Gateway, but safe for completeness)
       exports.push(NotificationsGateway);
     }
+    
+    // FIX: The issue might have been with the original logic's flow leading
+    // to an incorrect `providers` array in the final return object.
+    // The previous implementation block had the correct logic commented out
+    // and the incorrect one returned, which might be a copy-paste error.
+    // Ensure the above calculated 'providers' array is used.
 
     return {
       module: NotificationsModule,
-      providers,
+      providers, // Use the dynamically built providers array
       controllers,
       exports
     };
-
-    // const providers: Provider[] = [
-    //   optionsProvider,
-    //   notificationCenterProvider,
-    //   NotificationsService // <--- NotificationsService is the provider here
-    // ];
-
-    // const controllers = options.enableRestApi !== false 
-    //   ? [NotificationsController] 
-    //   : [];
-
-    // const exports: any[] = [NotificationsService, NOTIFICATION_CENTER];
-
-    // // Add WebSocket gateway if enabled
-    // if (options.enableWebSocket !== false) {
-    //   providers.push(NotificationsGateway);
-    //   exports.push(NotificationsGateway);
-    // }
-
-    // return {
-    //   module: NotificationsModule,
-    //   providers, // <--- NotificationsGateway should NOT be here
-    //   controllers,
-    //   exports
-    // };
   }
 
   static forRootAsync(
