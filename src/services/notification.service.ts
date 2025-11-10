@@ -12,11 +12,13 @@ import { getNotificationCenterInstance } from '../module';
 export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(NotificationsService.name);
     private eventEmitter = new EventEmitter();
-
+    
+    private readonly notificationCenter: NotificationCenter
     constructor(
-        @Inject(NOTIFICATION_CENTER)
-        private readonly notificationCenter: NotificationCenter
-    ) {}
+        // @Inject(NOTIFICATION_CENTER)
+    ) {
+        this.notificationCenter = getNotificationCenterInstance();
+    }
 
     async onModuleInit() {
         await this.notificationCenter.start();
