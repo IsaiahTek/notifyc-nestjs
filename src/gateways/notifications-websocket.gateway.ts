@@ -41,6 +41,16 @@ export class NotificationsGateway
       });
     });
 
+    // 2. LISTEN TO THE LOCAL SERVICE EVENT EMITTER (via Service's onNotificationSent)
+    // This catches the immediate manual emit() from the NotificationsService.send() method.
+    this.notificationsService.onNotificationSent((notification) => {
+        console.log("⚡ Local Emitter: Broadcast triggered for: ", notification.userId);
+        this.broadcastToUser(notification.userId, 'notification', {
+            type: 'notification',
+            notification
+        });
+    });
+
     // Subscribe to unread count changes for all users
     this.notificationsService.onUnreadCountChange('*', (count, userId) => {
       this.broadcastToUser(userId, 'unread-count', {
