@@ -89,21 +89,38 @@ let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
         }
     }
     // File: notifications-websocket.gateway.ts
+    // File: notifications-websocket.gateway.ts
     broadcastToUser(userId, event, data) {
-        // 🌟 THE FIX: Ensure this.server is defined before proceeding
-        if (!this.server) {
-            this.logger.error('WebSocket server not initialized. Skipping broadcast.');
+        // 🌟 FIX: Check for the required structure and/or ensure the Socket.IO method is used correctly
+        // 1. Check if the server object is initialized AND has a sockets collection
+        // This is the structure that holds all client connections.
+        if (!this.server || !this.server.sockets) {
+            this.logger.error('WebSocket server or its sockets collection is not yet initialized. Skipping broadcast.');
             return;
         }
         const clientIds = this.userToClients.get(userId);
         if (!clientIds || clientIds.size === 0)
             return;
-        // Broadcast to all connected clients for this user
+        // 2. Use the correct property access: this.server.sockets is a Namespace.
+        // The error is likely here: this.server.sockets.sockets.get(clientId)
         clientIds.forEach(clientId => {
-            // The error point is now safe
-            const socket = this.server.sockets.sockets.get(clientId);
+            // Use the standard way to retrieve a socket by ID from the default namespace
+            // If your gateway uses a namespace (`/notifications`), you must use that namespace object.
+            // Since @WebSocketServer() by default points to the default namespace,
+            // and you are defining a separate namespace, we need to access the correct one.
+            // Let's assume `this.server` is correctly typed to the Server instance:
+            let socket = this.server.sockets.sockets.get(clientId);
+            // If the above line still fails, it means `this.server.sockets` is NOT the standard default namespace,
+            // or the server is not ready. Given your structure:
+            const namespace = this.server.of('/notifications'); // Access your specific namespace
+            if (!namespace) {
+                this.logger.error('Custom WebSocket namespace /notifications not initialized.');
+                return;
+            }
+            socket = namespace.sockets.get(clientId); // Access socket via the namespace
             if (socket) {
                 socket.emit(event, data);
+                // ... (optional log)
             }
         });
     }
