@@ -11,18 +11,21 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
+var __param = (this && this.__param) || function (paramIndex, decorator) {
+    return function (target, key) { decorator(target, key, paramIndex); }
+};
 var NotificationsService_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsService = void 0;
 const common_1 = require("@nestjs/common");
+const notifications_core_1 = require("@synq/notifications-core");
 const events_1 = require("events");
-const module_1 = require("../module");
+const types_1 = require("../types/types");
 let NotificationsService = NotificationsService_1 = class NotificationsService {
-    constructor() {
+    constructor(notificationCenter) {
+        this.notificationCenter = notificationCenter;
         this.logger = new common_1.Logger(NotificationsService_1.name);
         this.eventEmitter = new events_1.EventEmitter();
-        this.notificationCenter = (0, module_1.getNotificationCenterInstance)();
-        this.logger.log('NotificationsService constructor completed. Center instance retrieved statically.');
     }
     async onModuleInit() {
         await this.notificationCenter.start();
@@ -138,5 +141,6 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
 exports.NotificationsService = NotificationsService;
 exports.NotificationsService = NotificationsService = NotificationsService_1 = __decorate([
     (0, common_1.Injectable)(),
-    __metadata("design:paramtypes", [])
+    __param(0, (0, common_1.Inject)(types_1.NOTIFICATION_CENTER)),
+    __metadata("design:paramtypes", [notifications_core_1.NotificationCenter])
 ], NotificationsService);

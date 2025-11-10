@@ -13,11 +13,10 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(NotificationsService.name);
     private eventEmitter = new EventEmitter();
 
-    private readonly notificationCenter: NotificationCenter;
-    constructor() {
-        this.notificationCenter = getNotificationCenterInstance();
-        this.logger.log('NotificationsService constructor completed. Center instance retrieved statically.');
-    }
+    constructor(
+        @Inject(NOTIFICATION_CENTER)
+        private readonly notificationCenter: NotificationCenter
+    ) {}
 
     async onModuleInit() {
         await this.notificationCenter.start();
