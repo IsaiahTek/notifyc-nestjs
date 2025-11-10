@@ -4,6 +4,8 @@ export declare class NotificationsService implements OnModuleInit, OnModuleDestr
     private readonly notificationCenter;
     private readonly logger;
     private eventEmitter;
+    private isReady;
+    private onReadyResolve;
     constructor(notificationCenter: NotificationCenter);
     onModuleInit(): Promise<void>;
     onModuleDestroy(): Promise<void>;

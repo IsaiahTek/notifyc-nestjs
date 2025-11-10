@@ -12,14 +12,22 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     private readonly logger = new Logger(NotificationsService.name);
     private eventEmitter = new EventEmitter();
 
+    private isReady: Promise<void>;
+    private onReadyResolve!: () => void;
+
     constructor(
         @Inject(NOTIFICATION_CENTER)
         private readonly notificationCenter: NotificationCenter
-    ) { }
+    ) {
+        this.isReady = new Promise(resolve => {
+            this.onReadyResolve = resolve;
+        });
+    }
 
     async onModuleInit() {
         await this.notificationCenter.start();
         this.logger.log('Notification system started');
+        this.onReadyResolve();
     }
 
     async onModuleDestroy() {
@@ -45,6 +53,8 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
 
     async send(input: NotificationInput): Promise<Notification> {
 
+        await this.isReady;
+
         // console.log("NOTIFICATION INPUT: ", input);
         // this.logger.log("NOTIFICATION INPUT: ", input);
 
@@ -53,7 +63,7 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
         try {
             // 1. Await the external library's call
             notification = await this.notificationCenter.send(input);
-            
+
             // 🌟 MISSING LINE: Emit the local event for the WebSocket to pick up
             this.eventEmitter.emit('notification:sent', notification); // <--- ADD THIS LINE
 
@@ -79,6 +89,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     async sendBatch(inputs: NotificationInput[]): Promise<Notification[]> {
+        
+        await this.isReady;
+
         const notifications = await this.notificationCenter.sendBatch(inputs);
 
         // Emit event for each notification
@@ -90,6 +103,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     async schedule(input: NotificationInput, when: Date): Promise<string> {
+        
+        await this.isReady;
+
         return this.notificationCenter.schedule(input, when);
     }
 
@@ -117,6 +133,9 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     // ========== STATE OPERATIONS ==========
 
     async markAsRead(notificationId: string): Promise<void> {
+        
+        await this.isReady;
+
         const notification = await this.notificationCenter.getById(notificationId);
         await this.notificationCenter.markAsRead(notificationId);
 
@@ -127,15 +146,21 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     }
 
     async markAllAsRead(userId: string): Promise<void> {
+        await this.isReady;
+
         await this.notificationCenter.markAllAsRead(userId);
         this.eventEmitter.emit('unread:changed', userId, 0);
     }
 
     async delete(notificationId: string): Promise<void> {
+        await this.isReady;
+
         return this.notificationCenter.delete(notificationId);
     }
 
     async deleteAll(userId: string): Promise<void> {
+        await this.isReady;
+
         return this.notificationCenter.deleteAll(userId);
     }
 
@@ -155,7 +180,11 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     // ========== TEMPLATES ==========
 
     registerTemplate(template: NotificationTemplate): void {
-        this.notificationCenter.registerTemplate(template);
+        this.isReady.then(() => {
+            this.notificationCenter.registerTemplate(template);
+            this.logger.log(`Notification template registered: ${template.type}`);
+        })
+        
     }
 
     // ========== SUBSCRIPTIONS ==========

@@ -26,10 +26,14 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         this.notificationCenter = notificationCenter;
         this.logger = new common_1.Logger(NotificationsService_1.name);
         this.eventEmitter = new events_1.EventEmitter();
+        this.isReady = new Promise(resolve => {
+            this.onReadyResolve = resolve;
+        });
     }
     async onModuleInit() {
         await this.notificationCenter.start();
         this.logger.log('Notification system started');
+        this.onReadyResolve();
     }
     async onModuleDestroy() {
         await this.notificationCenter.stop();
@@ -47,6 +51,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     // ========== SEND OPERATIONS ==========
     // File: notification.service.ts
     async send(input) {
+        await this.isReady;
         // console.log("NOTIFICATION INPUT: ", input);
         // this.logger.log("NOTIFICATION INPUT: ", input);
         let notification;
@@ -73,6 +78,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         return notification;
     }
     async sendBatch(inputs) {
+        await this.isReady;
         const notifications = await this.notificationCenter.sendBatch(inputs);
         // Emit event for each notification
         notifications.forEach(notification => {
@@ -81,6 +87,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         return notifications;
     }
     async schedule(input, when) {
+        await this.isReady;
         return this.notificationCenter.schedule(input, when);
     }
     // ========== QUERY OPERATIONS ==========
@@ -98,6 +105,7 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     // ========== STATE OPERATIONS ==========
     async markAsRead(notificationId) {
+        await this.isReady;
         const notification = await this.notificationCenter.getById(notificationId);
         await this.notificationCenter.markAsRead(notificationId);
         if (notification) {
@@ -106,13 +114,16 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         }
     }
     async markAllAsRead(userId) {
+        await this.isReady;
         await this.notificationCenter.markAllAsRead(userId);
         this.eventEmitter.emit('unread:changed', userId, 0);
     }
     async delete(notificationId) {
+        await this.isReady;
         return this.notificationCenter.delete(notificationId);
     }
     async deleteAll(userId) {
+        await this.isReady;
         return this.notificationCenter.deleteAll(userId);
     }
     // ========== PREFERENCES ==========
@@ -124,7 +135,10 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     // ========== TEMPLATES ==========
     registerTemplate(template) {
-        this.notificationCenter.registerTemplate(template);
+        this.isReady.then(() => {
+            this.notificationCenter.registerTemplate(template);
+            this.logger.log(`Notification template registered: ${template.type}`);
+        });
     }
     // ========== SUBSCRIPTIONS ==========
     subscribe(userId, callback) {
