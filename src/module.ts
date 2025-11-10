@@ -9,6 +9,7 @@ import { NotificationCenter } from '@synq/notifications-core';
  * Stores the single initialized instance of the NotificationCenter.
  */
 let globalNotificationCenterInstance: NotificationCenter | null = null;
+let initializationPromise: Promise<NotificationCenter> | null = null;
 
 /**
  * Creates the NotificationCenter instance and performs async startup.
@@ -19,32 +20,42 @@ async function createNotificationCenterAndSetGlobal(options: NotificationsModule
         return globalNotificationCenterInstance;
     }
 
-    console.log('NotificationCenter: Creating new instance...');
-
-    const center = new NotificationCenter({
-        storage: options.storage,
-        transports: options.transports,
-        queue: options.queue,
-        workers: options.workers,
-        cleanup: options.cleanup,
-        middleware: options.middleware
-    });
-
-    console.log('NotificationCenter: Instance created, registering templates...');
-
-    if (options.templates) {
-        options.templates.forEach(template => {
-            center.registerTemplate(template);
-            console.log(`NotificationCenter: Template registered: ${template.id}`);
-        });
+    // Prevent multiple concurrent initializations
+    if (initializationPromise) {
+        console.log('NotificationCenter: Waiting for existing initialization...');
+        return initializationPromise;
     }
 
-    console.log('NotificationCenter: Starting center...');
-    await center.start();
-    console.log('NotificationCenter: Core library started successfully.');
+    console.log('NotificationCenter: Creating new instance...');
 
-    globalNotificationCenterInstance = center;
-    return center;
+    initializationPromise = (async () => {
+        const center = new NotificationCenter({
+            storage: options.storage,
+            transports: options.transports,
+            queue: options.queue,
+            workers: options.workers,
+            cleanup: options.cleanup,
+            middleware: options.middleware
+        });
+
+        console.log('NotificationCenter: Instance created, registering templates...');
+
+        if (options.templates) {
+            options.templates.forEach(template => {
+                center.registerTemplate(template);
+                console.log(`NotificationCenter: Template registered: ${template.id}`);
+            });
+        }
+
+        console.log('NotificationCenter: Starting center...');
+        await center.start();
+        console.log('NotificationCenter: Core library started successfully.');
+
+        globalNotificationCenterInstance = center;
+        return center;
+    })();
+
+    return initializationPromise;
 }
 
 export function getNotificationCenterInstance(): NotificationCenter {
@@ -68,7 +79,7 @@ export class NotificationsModule {
             templatesCount: options.templates?.length || 0
         });
 
-        // Step 1: Initialize the NotificationCenter asynchronously
+        // This provider ensures initialization happens, but we don't inject it anywhere
         const InitializationProvider: Provider = {
             provide: 'NOTIFICATION_MODULE_INITIALIZER',
             useFactory: async () => {
@@ -79,7 +90,8 @@ export class NotificationsModule {
             },
         };
 
-        // Step 2: Provide NotificationsService as a regular provider
+        // The service is a simple class - NestJS will inject it normally
+        // It retrieves the center via the global getter in its onModuleInit
         const providers: Provider[] = [
             InitializationProvider,
             NotificationsService,
@@ -95,20 +107,22 @@ export class NotificationsModule {
 
         const exports: any[] = [NotificationsService];
 
-        // Step 3: Add Gateway as a normal provider (not factory)
-        // This ensures NestJS properly initializes it as a WebSocket gateway
+        // Add Gateway as a simple provider - it will inject NotificationsService normally
         if (options.enableWebSocket !== false) {
             console.log('📦 Adding WebSocket Gateway...');
             providers.push(NotificationsGateway);
         }
 
         console.log('✅ NotificationsModule.forRoot() configuration complete');
+        console.log('📦 Final provider count:', providers.length);
 
         return {
             module: NotificationsModule,
             providers,
             controllers,
-            exports
+            exports,
+            // Mark the module as global so NotificationsService is available everywhere
+            global: true,
         };
     }
 
@@ -116,10 +130,10 @@ export class NotificationsModule {
         const InitializationProvider: Provider = {
             provide: 'NOTIFICATION_MODULE_INITIALIZER_ASYNC',
             useFactory: async (...args: any[]) => {
-                console.log('NOTIFICATION_MODULE_INITIALIZER_ASYNC: Starting...');
+                console.log('⚙️  NOTIFICATION_MODULE_INITIALIZER_ASYNC: Starting...');
                 const resolvedOptions = await options.useFactory?.(...args);
                 const center = await createNotificationCenterAndSetGlobal(resolvedOptions!);
-                console.log('NOTIFICATION_MODULE_INITIALIZER_ASYNC: Complete.');
+                console.log('✅ NOTIFICATION_MODULE_INITIALIZER_ASYNC: Complete.');
                 return center;
             },
             inject: options.inject,
@@ -128,26 +142,19 @@ export class NotificationsModule {
         const providers: Provider[] = [
             InitializationProvider,
             NotificationsService,
+            NotificationsGateway,
         ];
 
         const controllers = [NotificationsController];
         const exports: any[] = [NotificationsService];
-
-        providers.push({
-            provide: NotificationsGateway,
-            useFactory: (notificationsService: NotificationsService) => {
-                console.log('NotificationsGateway (async): Creating instance...');
-                return new NotificationsGateway(notificationsService);
-            },
-            inject: [NotificationsService],
-        });
 
         return {
             module: NotificationsModule,
             imports: options.imports,
             providers,
             controllers,
-            exports
+            exports,
+            global: true,
         };
     }
 }
