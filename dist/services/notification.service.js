@@ -46,6 +46,8 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     }
     // ========== SEND OPERATIONS ==========
     async send(input) {
+        console.log("NOTIFICATION INPUT: ", input);
+        this.logger.log("NOTIFICATION INPUT: ", input);
         const notification = await this.notificationCenter.send(input);
         // // Emit event for WebSocket to pick up
         // this.eventEmitter.emit('notification:sent', notification);

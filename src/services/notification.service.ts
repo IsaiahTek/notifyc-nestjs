@@ -42,6 +42,10 @@ export class NotificationsService implements OnModuleInit, OnModuleDestroy {
     // ========== SEND OPERATIONS ==========
 
     async send(input: NotificationInput): Promise<Notification> {
+        
+        console.log("NOTIFICATION INPUT: ", input);
+        this.logger.log("NOTIFICATION INPUT: ", input);
+
         const notification = await this.notificationCenter.send(input);
 
         // // Emit event for WebSocket to pick up
