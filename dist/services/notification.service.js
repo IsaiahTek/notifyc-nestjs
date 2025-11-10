@@ -53,6 +53,8 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         try {
             // 1. Await the external library's call
             notification = await this.notificationCenter.send(input);
+            // 🌟 MISSING LINE: Emit the local event for the WebSocket to pick up
+            this.eventEmitter.emit('notification:sent', notification); // <--- ADD THIS LINE
         }
         catch (error) {
             // 2. Catch ANY error that happens during the external call
