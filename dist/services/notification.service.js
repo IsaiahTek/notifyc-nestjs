@@ -26,6 +26,8 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
         this.notificationCenter = notificationCenter;
         this.logger = new common_1.Logger(NotificationsService_1.name);
         this.eventEmitter = new events_1.EventEmitter();
+        // ADDED: Flag to track if startup failed
+        this.startupFailed = false;
         this.isReady = new Promise(resolve => {
             this.onReadyResolve = resolve;
         });
@@ -33,18 +35,20 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     // File: notification.service.ts (Library Code)
     async onModuleInit() {
         this.logger.log('--- 1. onModuleInit STARTING ---'); // <--- LOG 1
-        // Check if the NotificationCenter start call is the issue
         try {
-            await this.notificationCenter.start(); // <-- This is the suspect line
-            this.logger.log('--- 2. NotificationCenter STARTED OK ---'); // <--- LOG 2
+            // Immediately resolve the promise to unblock DI resolution
+            // THIS IS THE CRITICAL CHANGE
             this.onReadyResolve();
-            this.logger.log('--- 3. Ready Promise RESOLVED ---'); // <--- LOG 3
+            this.logger.log('--- 2. Ready Promise RESOLVED (Unblocked DI) ---');
+            // Now, safely await the start() call. If it hangs, at least the 
+            // NotificationsService instance is available for injection.
+            await this.notificationCenter.start();
+            this.logger.log('--- 3. NotificationCenter STARTED OK ---');
         }
         catch (e) {
             this.logger.error('--- 🚨 CRITICAL STARTUP FAILURE ---', e);
-            // If it fails, we still need to resolve the promise to unblock the hanging HTTP request.
-            // Resolve the promise, but ensure the send() method fails gracefully later.
-            this.onReadyResolve();
+            this.startupFailed = true; // Set flag to fail gracefully later
+            // The promise is already resolved, so we just log the failure.
         }
     }
     async onModuleDestroy() {
@@ -64,30 +68,21 @@ let NotificationsService = NotificationsService_1 = class NotificationsService {
     // File: notification.service.ts
     async send(input) {
         await this.isReady;
-        // console.log("NOTIFICATION INPUT: ", input);
-        // this.logger.log("NOTIFICATION INPUT: ", input);
-        this.logger.log(`--- 4. SEND METHOD RESUMED. Calling NotificationCenter.send()... ---`); // <--- MUST ADD THIS LOG
+        if (this.startupFailed) {
+            throw new common_1.InternalServerErrorException('Notification system failed to start during initialization.');
+        }
+        this.logger.log(`--- 4. SEND METHOD RESUMED. Calling NotificationCenter.send()... ---`);
         let notification;
         try {
-            // 1. Await the external library's call
             notification = await this.notificationCenter.send(input);
-            // 🌟 MISSING LINE: Emit the local event for the WebSocket to pick up
-            this.eventEmitter.emit('notification:sent', notification); // <--- ADD THIS LINE
+            this.eventEmitter.emit('notification:sent', notification);
         }
         catch (error) {
-            // 2. Catch ANY error that happens during the external call
             const errorMessage = `Failed to send notification via NotificationCenter: ${error.message}`;
             console.error(errorMessage, error); // Use console.error for visibility
             this.logger.error(errorMessage, error.stack);
-            // Decide how to handle the error (e.g., throw it up or return null)
-            // Throwing is usually best to signal failure to the client
             throw new common_1.InternalServerErrorException('Notification sending failed.');
         }
-        // 3. This code WILL ONLY RUN if the try block succeeds
-        // console.log("NOTIFICATION SENT: ", notification);
-        // this.logger.log("NOTIFICATION SENT: ", notification);
-        // If the log is still missing, the code is hanging BEFORE the log
-        // If an ERROR LOG now appears, you've found the issue!
         return notification;
     }
     async sendBatch(inputs) {
