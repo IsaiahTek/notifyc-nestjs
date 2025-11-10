@@ -92,32 +92,36 @@ let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
     // File: notifications-websocket.gateway.ts
     // File: notifications-websocket.gateway.ts
     // File: notifications-websocket.gateway.ts
+    // File: notifications-websocket.gateway.ts
     broadcastToUser(userId, event, data) {
-        // 🌟 FIX: Assume this.server IS the /notifications Namespace instance
-        // Check for the required structure (sockets map)
-        if (!this.server || !this.server.sockets) {
-            this.logger.error('WebSocket server (Namespace) not fully initialized. Skipping broadcast.');
+        if (!this.server) {
+            this.logger.error('WebSocket server (Namespace) not initialized. Skipping broadcast.');
             return;
         }
-        // REMOVE: const namespace = this.server.of('/notifications');
-        // We treat 'this.server' AS the namespace object.
-        const namespace = this.server; // Alias the injected server as the namespace
+        // 1. Assign the injected instance to a safe variable
+        const namespace = this.server;
+        // 2. We are going to access the client map directly from the namespace.sockets property.
+        // We cast to 'any' here to bypass the faulty TypeScript definition that requires the double 'sockets'.
+        const clientMap = namespace.sockets;
+        // Guard against the client map itself not being initialized
+        if (!clientMap) {
+            this.logger.error('Namespace client map not ready. Skipping broadcast.');
+            return;
+        }
         const clientIds = this.userToClients.get(userId);
         if (!clientIds || clientIds.size === 0)
             return;
-        // Use process.nextTick for robustness against synchronous emission race condition
+        // Defer the execution to the next tick for stability
         process.nextTick(() => {
             clientIds.forEach(clientId => {
-                // Access the socket via the Namespace's socket collection
-                // NOTE: The type should ideally be Namespace, but we access the sockets property directly.
-                // In Socket.IO, the client collection is accessible via `namespace.sockets.get(id)`.
-                const socket = namespace.sockets.sockets.get(clientId);
+                // 🌟 THE FIX: Use the single access point: clientMap.get(clientId)
+                const socket = clientMap.get(clientId);
                 if (socket) {
                     socket.emit(event, data);
                     this.logger.log(`✅ SENT ${event} to client: ${clientId}`);
                 }
                 else {
-                    this.logger.warn(`Socket ID ${clientId} not found in namespace collection.`);
+                    this.logger.warn(`Socket ID ${clientId} not found for user ${userId}.`);
                 }
             });
         });
