@@ -8,7 +8,7 @@ export declare class NotificationsController {
         count: number;
     }>;
     getStats(userId: string): Promise<import("@synq/notifications-core/").NotificationStats>;
-    getPreferences(userId: string): Promise<any>;
+    getPreferences(userId: string): Promise<NotificationPreferences>;
     updatePreferences(userId: string, preferences: Partial<NotificationPreferences>): Promise<{
         success: boolean;
     }>;
