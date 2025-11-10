@@ -59,41 +59,57 @@ export function getNotificationCenterInstance(): NotificationCenter {
 export class NotificationsModule {
 
     static forRoot(options: NotificationsModuleOptions): DynamicModule {
+        console.log('📦 NotificationsModule.forRoot() called');
+        console.log('📦 Options:', {
+            hasStorage: !!options.storage,
+            hasTransports: !!options.transports,
+            enableWebSocket: options.enableWebSocket,
+            enableRestApi: options.enableRestApi,
+            templatesCount: options.templates?.length || 0
+        });
+
         // Step 1: Initialize the NotificationCenter asynchronously
         const InitializationProvider: Provider = {
             provide: 'NOTIFICATION_MODULE_INITIALIZER',
             useFactory: async () => {
-                console.log('NOTIFICATION_MODULE_INITIALIZER: Starting initialization...');
+                console.log('⚙️  NOTIFICATION_MODULE_INITIALIZER: Starting initialization...');
                 const center = await createNotificationCenterAndSetGlobal(options);
-                console.log('NOTIFICATION_MODULE_INITIALIZER: Initialization complete.');
+                console.log('✅ NOTIFICATION_MODULE_INITIALIZER: Initialization complete.');
                 return center;
             },
         };
 
         // Step 2: Provide NotificationsService as a regular provider
-        // It doesn't need to wait for initialization since it uses the global getter
         const providers: Provider[] = [
             InitializationProvider,
             NotificationsService,
         ];
 
+        console.log('📦 Providers registered:', providers.length);
+
         const controllers = options.enableRestApi !== false
             ? [NotificationsController]
             : [];
+
+        console.log('📦 Controllers registered:', controllers.length);
 
         const exports: any[] = [NotificationsService];
 
         // Step 3: Add Gateway with explicit dependency injection
         if (options.enableWebSocket !== false) {
+            console.log('📦 Adding WebSocket Gateway...');
             providers.push({
                 provide: NotificationsGateway,
                 useFactory: (notificationsService: NotificationsService) => {
-                    console.log('NotificationsGateway: Creating instance with injected service...');
+                    console.log('🌐 NotificationsGateway: Creating instance with injected service...');
+                    console.log('🌐 Service available:', !!notificationsService);
                     return new NotificationsGateway(notificationsService);
                 },
                 inject: [NotificationsService],
             });
         }
+
+        console.log('✅ NotificationsModule.forRoot() configuration complete');
 
         return {
             module: NotificationsModule,
