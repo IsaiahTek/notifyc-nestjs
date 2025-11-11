@@ -47,6 +47,10 @@ export class NotificationsGateway
   onModuleInit() {
     this.logger.log('WebSocket gateway initialization start.');
 
+    // Get the service instance from the global singleton
+    this.notificationsService = getNotificationsServiceInstance();
+    this.logger.log('✅ NotificationsService retrieved from singleton');
+
     // 1. Subscribe to the Service's internal event emitter for immediate broadcasts.
     this.notificationsService.onNotificationSent((notification) => {
       this.logger.verbose(`Local Emitter triggered for new notification: ${notification.id} (User: ${notification.userId})`);

@@ -16,6 +16,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsGateway = void 0;
 const common_1 = require("@nestjs/common");
 const websockets_1 = require("@nestjs/websockets");
+const module_1 = require("../module");
 const socket_io_1 = require("socket.io");
 let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
     constructor() {
@@ -36,6 +37,9 @@ let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
     }
     onModuleInit() {
         this.logger.log('WebSocket gateway initialization start.');
+        // Get the service instance from the global singleton
+        this.notificationsService = (0, module_1.getNotificationsServiceInstance)();
+        this.logger.log('✅ NotificationsService retrieved from singleton');
         // 1. Subscribe to the Service's internal event emitter for immediate broadcasts.
         this.notificationsService.onNotificationSent((notification) => {
             this.logger.verbose(`Local Emitter triggered for new notification: ${notification.id} (User: ${notification.userId})`);
