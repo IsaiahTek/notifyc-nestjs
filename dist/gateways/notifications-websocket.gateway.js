@@ -16,15 +16,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.NotificationsGateway = void 0;
 const common_1 = require("@nestjs/common");
 const websockets_1 = require("@nestjs/websockets");
-const notification_service_1 = require("../services/notification.service");
 const socket_io_1 = require("socket.io");
 let NotificationsGateway = NotificationsGateway_1 = class NotificationsGateway {
-    constructor(notificationsService) {
-        this.notificationsService = notificationsService;
+    constructor() {
         this.logger = new common_1.Logger(NotificationsGateway_1.name);
-        // Maps user ID to a set of their connected socket IDs for broadcasting
         this.userToClients = new Map();
-        this.logger.log('NotificationsGateway: Constructor called');
+        this.logger.log('NotificationsGateway: Constructor called (no dependencies)');
     }
     afterInit(server) {
         this.logger.log('🚀 WebSocket server initialized (afterInit hook)');
@@ -185,5 +182,5 @@ exports.NotificationsGateway = NotificationsGateway = NotificationsGateway_1 = _
         cors: { origin: '*' },
         namespace: '/notifications'
     }),
-    __metadata("design:paramtypes", [notification_service_1.NotificationsService])
+    __metadata("design:paramtypes", [])
 ], NotificationsGateway);

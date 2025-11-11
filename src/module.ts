@@ -6,6 +6,7 @@ import { NotificationsGateway } from './gateways/notifications-websocket.gateway
 import { NotificationCenter } from '@synq/notifications-core';
 
 let globalNotificationCenterInstance: NotificationCenter | null = null;
+let globalNotificationsServiceInstance: NotificationsService | null = null;
 let initializationPromise: Promise<NotificationCenter> | null = null;
 
 async function createNotificationCenterAndSetGlobal(options: NotificationsModuleOptions): Promise<NotificationCenter> {
@@ -58,15 +59,17 @@ export function getNotificationCenterInstance(): NotificationCenter {
     return globalNotificationCenterInstance;
 }
 
-/**
- * A static module that provides the gateway.
- * This is imported separately to work around DI issues with dynamic modules.
- */
-@Module({
-    providers: [NotificationsGateway],
-    exports: [NotificationsGateway],
-})
-export class NotificationsGatewayModule {}
+export function getNotificationsServiceInstance(): NotificationsService {
+    if (!globalNotificationsServiceInstance) {
+        throw new Error("NotificationsService is not initialized. This should not happen.");
+    }
+    return globalNotificationsServiceInstance;
+}
+
+export function setNotificationsServiceInstance(service: NotificationsService): void {
+    globalNotificationsServiceInstance = service;
+    console.log('✅ NotificationsService singleton instance set globally');
+}
 
 @Global()
 @Module({})
@@ -74,6 +77,13 @@ export class NotificationsModule {
 
     static forRoot(options: NotificationsModuleOptions): DynamicModule {
         console.log('📦 NotificationsModule.forRoot() called');
+        console.log('📦 Options:', {
+            hasStorage: !!options.storage,
+            hasTransports: !!options.transports,
+            enableWebSocket: options.enableWebSocket,
+            enableRestApi: options.enableRestApi,
+            templatesCount: options.templates?.length || 0
+        });
 
         const InitializationProvider: Provider = {
             provide: 'NOTIFICATION_MODULE_INITIALIZER',
@@ -85,26 +95,42 @@ export class NotificationsModule {
             },
         };
 
+        // Factory provider for NotificationsService that also sets the global singleton
+        const ServiceProvider: Provider = {
+            provide: NotificationsService,
+            useFactory: () => {
+                console.log('🔧 Creating NotificationsService instance');
+                const service = new NotificationsService();
+                setNotificationsServiceInstance(service);
+                return service;
+            },
+        };
+
         const providers: Provider[] = [
             InitializationProvider,
-            NotificationsService,
+            ServiceProvider,
         ];
+
+        console.log('📦 Providers registered:', providers.length);
 
         const controllers = options.enableRestApi !== false
             ? [NotificationsController]
             : [];
 
-        const imports = options.enableWebSocket !== false
-            ? [NotificationsGatewayModule]
-            : [];
+        console.log('📦 Controllers registered:', controllers.length);
 
         const exports: any[] = [NotificationsService];
+
+        // Add Gateway as a simple class provider - it will use the global getter
+        if (options.enableWebSocket !== false) {
+            console.log('📦 Adding WebSocket Gateway...');
+            providers.push(NotificationsGateway);
+        }
 
         console.log('✅ NotificationsModule.forRoot() configuration complete');
 
         return {
             module: NotificationsModule,
-            imports,
             providers,
             controllers,
             exports,
@@ -125,18 +151,28 @@ export class NotificationsModule {
             inject: options.inject,
         };
 
+        const ServiceProvider: Provider = {
+            provide: NotificationsService,
+            useFactory: () => {
+                console.log('🔧 Creating NotificationsService instance (async)');
+                const service = new NotificationsService();
+                setNotificationsServiceInstance(service);
+                return service;
+            },
+        };
+
         const providers: Provider[] = [
             InitializationProvider,
-            NotificationsService,
+            ServiceProvider,
+            NotificationsGateway,
         ];
 
         const controllers = [NotificationsController];
-        const importsArray = [...(options.imports || []), NotificationsGatewayModule];
         const exports: any[] = [NotificationsService];
 
         return {
             module: NotificationsModule,
-            imports: importsArray,
+            imports: options.imports,
             providers,
             controllers,
             exports,

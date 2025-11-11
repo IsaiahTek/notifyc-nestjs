@@ -10,6 +10,7 @@ import {
   SubscribeMessage,
 } from '@nestjs/websockets';
 import { NotificationsService } from '../services/notification.service';
+import { getNotificationsServiceInstance } from '../module';
 import { Unsubscribe } from '@synq/notifications-core';
 import { Server, Socket } from 'socket.io';
 
@@ -20,14 +21,14 @@ import { Server, Socket } from 'socket.io';
 export class NotificationsGateway
   implements OnGatewayConnection, OnGatewayDisconnect, OnGatewayInit, OnModuleInit {
   private readonly logger = new Logger(NotificationsGateway.name);
-  // Maps user ID to a set of their connected socket IDs for broadcasting
   private userToClients = new Map<string, Set<string>>(); 
+  private notificationsService!: NotificationsService;
 
   @WebSocketServer()
   server!: Server;
 
-  constructor(private readonly notificationsService: NotificationsService) {
-    this.logger.log('NotificationsGateway: Constructor called');
+  constructor() {
+    this.logger.log('NotificationsGateway: Constructor called (no dependencies)');
   }
 
   afterInit(server: Server) {
